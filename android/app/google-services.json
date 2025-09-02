@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "732798475080",
+    "project_id": "wizmarketing-d024d",
+    "storage_bucket": "wizmarketing-d024d.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:732798475080:android:2093d2eae8708f5743f17d",
+        "android_client_info": {
+          "package_name": "com.wizmarket"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCdtoIeXxEKm6hNsi_52Imd-PTO3sS01Ow"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

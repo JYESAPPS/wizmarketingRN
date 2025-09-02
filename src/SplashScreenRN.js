@@ -4,10 +4,10 @@ import { View, Text, Image, StyleSheet, Animated, Easing } from 'react-native';
 
 export default function SplashScreenRN({
   onDone,
-  minDuration = 2000,        // 형 요구대로 기본 2초
-  brandBg = '#FF7E19',
-  brandText = '#ffffff',
-  primary = '#ffffff',
+  minDuration = 2000,        // 기본 2초
+  brandBg = '#6A0DAD',       // 💜 배경 보라색
+  brandText = '#FFFFFF',     // 흰색 텍스트
+  primary = '#FFFFFF',       // 흰색 도트
   logoSource,                 // 예: require('./assets/logo.png')
   brandName = 'Wiz Market',
 }) {
@@ -69,13 +69,7 @@ export default function SplashScreenRN({
       }, remain);
     };
 
-    // RN에선 window load 개념이 없으니, 외부에서 onDone을 호출하지 않는 경우
-    // 화면 마운트 시점 기준으로 minDuration 뒤에 닫히게만 동작.
-    // → WebView 로딩 이벤트와 연동하려면 부모(App.js)에서 onDone 트리거해도 됨.
-    // 여기서는 "최소 시간 보장 후 닫기" 기본 동작만.
     finish();
-
-    // cleanup 불필요(Animated.loop 내부가 계속 도니 unmount 시 자동 정리)
   }, [minDuration]);
 
   if (!visible) return null;

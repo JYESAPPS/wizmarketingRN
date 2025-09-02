@@ -77,9 +77,9 @@ android {
     buildToolsVersion rootProject.ext.buildToolsVersion
     compileSdk rootProject.ext.compileSdkVersion
 
-    namespace "com.seoungwon"
+    namespace "com.wizmarket"
     defaultConfig {
-        applicationId "com.seoungwon"
+        applicationId "com.wizmarket"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
         versionCode 1
@@ -116,4 +116,8 @@ dependencies {
     } else {
         implementation jscFlavor
     }
+
+      implementation(platform("com.google.firebase:firebase-bom:33.3.0"))
 }
+
+apply plugin: "com.google.gms.google-services"  // ✅ 파일 맨 아래
