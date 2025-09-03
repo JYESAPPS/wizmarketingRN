@@ -4,7 +4,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import '@react-native-firebase/app';
 import {
-  SafeAreaView, BackHandler, StyleSheet, Platform,
+  SafeAreaView, BackHandler, StyleSheet, Platform,Alert,
   Linking, LogBox, Animated, ToastAndroid, Easing,
 } from 'react-native';
 import { WebView } from 'react-native-webview';
@@ -109,6 +109,19 @@ const handleWebError = useCallback((payload) => {
     });
   }, [sendToWeb, token]);
 
+    const handleStartSubscription = useCallback(async (payload) => {
+      // TODO: react-native-iap 연동
+      sendToWeb('SUBSCRIPTION_RESULT', {
+        success: true,
+        product_id: payload?.product_id,
+        transaction_id: 'tx_demo_001',
+        expires_at:
+          payload?.product_type === 'subscription'
+            ? Date.now() + 30 * 24 * 3600_000
+            : undefined,
+      });
+    }, [sendToWeb]);
+    
   // 최초 실행 시 알림 권한만 요청
   useEffect(() => {
     (async () => {
@@ -172,6 +185,9 @@ const handleWebError = useCallback((payload) => {
 
         case 'CHECK_PERMISSION':    await handleCheckPermission(); break;
         case 'REQUEST_PERMISSION':  await handleRequestPermission(); break;
+
+        case 'START_SUBSCRIPTION':  await handleStartSubscription(data.payload); break;
+
         case 'START_SHARE': {
           try {
             const { image, caption, platform } = data.payload || {};
