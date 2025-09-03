@@ -26,7 +26,7 @@ const App = () => {
   const splashFade = useRef(new Animated.Value(1)).current;
 
   const bootTORef = useRef(null);
-  const lastNavStateRef = useRef(null);
+
   const backExitRef = useRef({ last: 0 });
 
   const [token, setToken] = useState('');
@@ -34,8 +34,38 @@ const App = () => {
 
   const lastNavRef = useRef({ isRoot: false, path: '/', canGoBack: false });
 
+  const lastNavStateRef = useRef({});      // 기본값은 객체
+
 
   useEffect(() => { LogBox.ignoreAllLogs(true); }, []);
+
+
+useEffect(() => {
+    const sub = BackHandler.addEventListener('hardwareBackPress', () => {
+    const nav = lastNavStateRef.current || {};
+    console.log('[HW BACK] event fired, nav=', nav);
+
+    const isRoot = nav.isRoot === true;
+    const webCanHandle =
+      !isRoot || nav.hasBlockingUI === true || nav.needsConfirm === true || nav.canGoBackInWeb === true;
+
+    if (webCanHandle) {
+      console.log('[HW BACK] sending BACK_REQUEST');
+      sendToWeb('BACK_REQUEST', { nav, at: Date.now() });
+      return true;
+    }
+
+    // 루트면 종료 확인…
+    Alert.alert('앱 종료', '앱을 종료할까요?', [
+      { text: '취소', style: 'cancel' },
+      { text: '종료', style: 'destructive', onPress: () => BackHandler.exitApp() },
+    ]);
+    return true;
+  });
+  return () => sub.remove();
+}, [sendToWeb]);
+
+
 
   const sendToWeb = useCallback((type, payload = {}) => {
     try {
@@ -164,21 +194,26 @@ const handleWebError = useCallback((payload) => {
         case 'EXIT_APP': BackHandler.exitApp(); break;
         // 웹이 현재 라우팅 상태를 알려줌 { isRoot, path?, length? ... }
         case 'NAV_STATE': {
-          const nav = data || {};
-          lastNavRef.current = {
-            isRoot: !!nav.isRoot,
-            path: nav.path ?? '',
-            canGoBack: !!nav.canGoBack,
-          };
-          // 웹에서 디버깅 보기 좋게 ACK도 돌려줌
-          sendToWeb('NAV_STATE_ACK', { nav: lastNavRef.current, at: Date.now() });
+            const nav = data.payload || {};
+            lastNavStateRef.current = {
+              isRoot: !!nav.isRoot,
+              path: nav.path ?? '',
+              // 웹에서 보내는 키가 프로젝트마다 다를 수 있어 둘 다 케어
+              canGoBackInWeb: nav.canGoBackInWeb === true || nav.canGoBack === true,
+              hasBlockingUI: !!nav.hasBlockingUI,
+              needsConfirm: !!nav.needsConfirm,
+            };
+            sendToWeb('NAV_STATE_ACK', { nav: lastNavStateRef.current, at: Date.now() });
           break;
         }
 
         // 네이티브(MainActivity.onBackPressed)에서 전달되는 물리 뒤로키 이벤트
         case 'BACK_PRESSED': {
-          const nav = lastNavRef.current || {};
+
           console.log(TAG, 'BACK_PRESSED with nav=', nav);
+
+          const nav = lastNavRef.current || {};
+    
           if (nav.isRoot === true) {
             Alert.alert(
               '앱 종료',
