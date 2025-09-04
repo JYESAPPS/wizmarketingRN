@@ -121,7 +121,7 @@ const handleWebError = useCallback((payload) => {
             : undefined,
       });
     }, [sendToWeb]);
-    
+
   // 최초 실행 시 알림 권한만 요청
   useEffect(() => {
     (async () => {
@@ -286,7 +286,7 @@ const handleWebError = useCallback((payload) => {
     <SafeAreaView style={styles.container}>
       <WebView
         ref={webViewRef}
-        source={{ uri: 'https://wizmarketing-d024d.web.app' }}
+        source={{ uri: 'https://wizad-b69ee.web.app' }}
         onMessage={onMessageFromWeb}
         onLoadStart={onWebViewLoadStart}
         onLoadProgress={({ nativeEvent }) => {
