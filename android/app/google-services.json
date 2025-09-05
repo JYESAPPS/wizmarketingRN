@@ -1,21 +1,21 @@
 {
   "project_info": {
-    "project_number": "266866879152",
-    "project_id": "wizad-b69ee",
-    "storage_bucket": "wizad-b69ee.firebasestorage.app"
+    "project_number": "552640991532",
+    "project_id": "story-universe-d9b96",
+    "storage_bucket": "story-universe-d9b96.firebasestorage.app"
   },
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "1:266866879152:android:de6726be47f1a315a26975",
+        "mobilesdk_app_id": "1:552640991532:android:4556eaf30621639d179c89",
         "android_client_info": {
-          "package_name": "com.wizmarket"
+          "package_name": "com.storyuniverse"
         }
       },
       "oauth_client": [],
       "api_key": [
         {
-          "current_key": "AIzaSyD3SfPCujTyzNmNvYhvMqp8GGeOAsp681o"
+          "current_key": "AIzaSyALusjTYctrvgCaIIuhuenfYE46mGUq508"
         }
       ],
       "services": {
