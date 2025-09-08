@@ -1,26 +1,44 @@
 {
   "project_info": {
-    "project_number": "552640991532",
-    "project_id": "story-universe-d9b96",
-    "storage_bucket": "story-universe-d9b96.firebasestorage.app"
+    "project_number": "266866879152",
+    "project_id": "wizad-b69ee",
+    "storage_bucket": "wizad-b69ee.firebasestorage.app"
   },
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "1:552640991532:android:4556eaf30621639d179c89",
+        "mobilesdk_app_id": "1:266866879152:android:de6726be47f1a315a26975",
         "android_client_info": {
-          "package_name": "com.storyuniverse"
+          "package_name": "com.wizmarket"
         }
       },
-      "oauth_client": [],
+      "oauth_client": [
+        {
+          "client_id": "266866879152-759ko2j84a4altfp719ndsh11lbfm3d3.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.wizmarket",
+            "certificate_hash": "5e8f16062ea3cd2c4a0d547876baa6f38cabf625"
+          }
+        },
+        {
+          "client_id": "266866879152-kfquq1i6r89tbqeramjjuaa2csmoegej.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
       "api_key": [
         {
-          "current_key": "AIzaSyALusjTYctrvgCaIIuhuenfYE46mGUq508"
+          "current_key": "AIzaSyD3SfPCujTyzNmNvYhvMqp8GGeOAsp681o"
         }
       ],
       "services": {
         "appinvite_service": {
-          "other_platform_oauth_client": []
+          "other_platform_oauth_client": [
+            {
+              "client_id": "266866879152-kfquq1i6r89tbqeramjjuaa2csmoegej.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
         }
       }
     }
