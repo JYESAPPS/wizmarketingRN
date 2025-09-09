@@ -20,6 +20,8 @@ import { GoogleSignin } from '@react-native-google-signin/google-signin';
 import { SafeAreaProvider, SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import SplashScreenRN from './SplashScreenRN';
 
+import KakaoLogins from '@react-native-seoul/kakao-login';
+
 const APP_VERSION = '1.0.0';
 const BOOT_TIMEOUT_MS = 8000;
 const MIN_SPLASH_MS = 1200;
@@ -169,49 +171,79 @@ const App = () => {
   const handleStartSignin = useCallback(async (payload) => {
     const provider = payload?.provider;
     try {
-      if (provider !== 'google') throw new Error('unsupported provider');
+      /** ────────────── Google 로그인 ────────────── */
+      if (provider === 'google') {
+        // A. 환경 체크
+        await GoogleSignin.hasPlayServices({ showPlayServicesUpdateDialog: true });
 
-      // A. 환경 체크
-      await GoogleSignin.hasPlayServices({ showPlayServicesUpdateDialog: true });
+        // B. 세션 초기화
+        try { await GoogleSignin.signOut(); } catch { }
+        try { await GoogleSignin.revokeAccess(); } catch { }
 
-      // B. 세션 초기화(안전)
-      try { await GoogleSignin.signOut(); } catch { }
-      try { await GoogleSignin.revokeAccess(); } catch { }
+        // C. 로그인
+        const res = await GoogleSignin.signIn(); // { idToken, user, ... }
+        let idToken = res?.idToken;
 
-      // C. 로그인
-      const res = await GoogleSignin.signIn(); // { idToken, user, ... }
-      let idToken = res?.idToken;
+        // D. 혹시 여전히 비어있으면 토큰 직접 획득
+        if (!idToken) {
+          try {
+            const tokens = await GoogleSignin.getTokens(); // { idToken, accessToken }
+            idToken = tokens?.idToken || null;
+          } catch { }
+        }
 
-      // D. 혹시 여전히 비어있으면 토큰 직접 획득
-      if (!idToken) {
-        try {
-          const tokens = await GoogleSignin.getTokens(); // { idToken, accessToken }
-          idToken = tokens?.idToken || null;
-        } catch { }
+        if (!idToken) throw new Error('no_id_token');
+
+        const googleCredential = auth.GoogleAuthProvider.credential(idToken);
+        const userCred = await auth().signInWithCredential(googleCredential);
+
+        safeSend('SIGNIN_RESULT', {
+          success: true,
+          provider: 'google',
+          user: {
+            uid: userCred.user.uid,
+            email: userCred.user.email,
+            displayName: userCred.user.displayName,
+            photoURL: userCred.user.photoURL,
+          },
+          expires_at: Date.now() + 6 * 3600 * 1000,
+        });
+        return;
       }
 
-      if (!idToken) throw new Error('no_id_token'); // 여전히 없으면 명확히 실패 처리
+      /** ────────────── Kakao 로그인 ────────────── */
+      if (provider === 'kakao') {
+        try { await KakaoLogins.logout(); } catch { }
+        try { await KakaoLogins.unlink(); } catch { }
 
-      const googleCredential = auth.GoogleAuthProvider.credential(idToken);
-      const userCred = await auth().signInWithCredential(googleCredential);
+        const { accessToken, refreshToken } = await KakaoLogins.login();
+        const profile = await KakaoLogins.getProfile();
 
-      safeSend('SIGNIN_RESULT', {
-        success: true,
-        provider: 'google',
-        user: {
-          uid: userCred.user.uid,
-          email: userCred.user.email,
-          displayName: userCred.user.displayName,
-          photoURL: userCred.user.photoURL,
-        },
-        expires_at: Date.now() + 6 * 3600 * 1000,
-      });
+        safeSend('SIGNIN_RESULT', {
+          success: true,
+          provider: 'kakao',
+          user: {
+            provider_id: String(profile?.id),
+            email: profile?.email || '',
+            displayName: profile?.nickname || '',
+            photoURL: profile?.profileImageUrl || '',
+          },
+          tokens: {
+            access_token: accessToken,
+            refresh_token: refreshToken || '',
+          },
+          expires_at: Date.now() + 6 * 3600 * 1000,
+        });
+        return;
+      }
+
+      throw new Error('unsupported_provider');
     } catch (err) {
       console.log('[LOGIN ERROR raw]', err, 'type=', typeof err);
 
       const code =
         (err && typeof err === 'object' && 'code' in err) ? err.code :
-          (String(err?.message || err).includes('no_id_token') ? 'no_id_token' : 'unknown_error');
+          (String(err?.message || '').includes('no_id_token') ? 'no_id_token' : 'unknown_error');
 
       const msg =
         (err && typeof err === 'object' && 'message' in err && err.message) ||
@@ -219,68 +251,74 @@ const App = () => {
 
       safeSend('SIGNIN_RESULT', {
         success: false,
-        provider: 'google',
+        provider,
         error_code: code,
         error_message: msg,
       });
     }
   }, [sendToWeb]);
-
   
   // const handleStartSignin = useCallback(async (payload) => {
   //   const provider = payload?.provider;
   //   try {
-  //     if (provider === 'google') {
-  //       // 🔑 Google 로그인 실제 연동
-  //       const { idToken } = await GoogleSignin.signIn();
-  //       if (!idToken) throw new Error('no_id_token');
+  //     if (provider !== 'google') throw new Error('unsupported provider');
 
-  //       const googleCredential = auth.GoogleAuthProvider.credential(idToken);
-  //       const userCred = await auth().signInWithCredential(googleCredential);
+  //     // A. 환경 체크
+  //     await GoogleSignin.hasPlayServices({ showPlayServicesUpdateDialog: true });
 
-  //       safeSend('SIGNIN_RESULT', {
-  //         success: true,
-  //         provider,
-  //         user: {
-  //           uid: userCred.user.uid,
-  //           email: userCred.user.email,
-  //           displayName: userCred.user.displayName,
-  //           photoURL: userCred.user.photoURL,
-  //         },
-  //         expires_at: Date.now() + 6 * 3600 * 1000,
-  //       });
-  //       return;
+  //     // B. 세션 초기화(안전)
+  //     try { await GoogleSignin.signOut(); } catch { }
+  //     try { await GoogleSignin.revokeAccess(); } catch { }
+
+  //     // C. 로그인
+  //     const res = await GoogleSignin.signIn(); // { idToken, user, ... }
+  //     let idToken = res?.idToken;
+
+  //     // D. 혹시 여전히 비어있으면 토큰 직접 획득
+  //     if (!idToken) {
+  //       try {
+  //         const tokens = await GoogleSignin.getTokens(); // { idToken, accessToken }
+  //         idToken = tokens?.idToken || null;
+  //       } catch { }
   //     }
 
-  //     if (provider === 'kakao') {
-  //       // ⛔ 아직 모의
-  //       safeSend('SIGNIN_RESULT', {
-  //         success: false,
-  //         provider,
-  //         error_code: 'kakao_not_configured',
-  //         message: '카카오 인증키/Redirect URI 미설정',
-  //       });
-  //       return;
-  //     }
+  //     if (!idToken) throw new Error('no_id_token'); // 여전히 없으면 명확히 실패 처리
 
-  //     throw new Error('unsupported provider');
+  //     const googleCredential = auth.GoogleAuthProvider.credential(idToken);
+  //     const userCred = await auth().signInWithCredential(googleCredential);
+
+  //     safeSend('SIGNIN_RESULT', {
+  //       success: true,
+  //       provider: 'google',
+  //       user: {
+  //         uid: userCred.user.uid,
+  //         email: userCred.user.email,
+  //         displayName: userCred.user.displayName,
+  //         photoURL: userCred.user.photoURL,
+  //       },
+  //       expires_at: Date.now() + 6 * 3600 * 1000,
+  //     });
   //   } catch (err) {
-  //     console.log('[LOGIN ERROR raw]', err);
+  //     console.log('[LOGIN ERROR raw]', err, 'type=', typeof err);
 
-  //     const code = (err && typeof err === 'object' && 'code' in err) ? err.code : 'unknown_error';
+  //     const code =
+  //       (err && typeof err === 'object' && 'code' in err) ? err.code :
+  //         (String(err?.message || err).includes('no_id_token') ? 'no_id_token' : 'unknown_error');
+
   //     const msg =
   //       (err && typeof err === 'object' && 'message' in err && err.message) ||
   //       (typeof err === 'string' ? err : JSON.stringify(err));
 
   //     safeSend('SIGNIN_RESULT', {
   //       success: false,
-  //       provider,
+  //       provider: 'google',
   //       error_code: code,
   //       error_message: msg,
   //     });
   //   }
   // }, [sendToWeb]);
 
+  
 
   const handleStartSignout = useCallback(async () => {
     try {
