@@ -262,6 +262,10 @@
 	[
 		{
 			"backtrace" : 4,
+			"id" : "react_codegen_RNCGeolocationSpec::@1b959fcb56e23f7716ba"
+		},
+		{
+			"backtrace" : 4,
 			"id" : "react_codegen_RNGoogleSignInCGen::@337b7b353bd94a4215c0"
 		},
 		{
@@ -271,10 +275,6 @@
 		{
 			"backtrace" : 4,
 			"id" : "react_codegen_RNShareSpec::@e6c4c2b5aedb2ea213b7"
-		},
-		{
-			"backtrace" : 4,
-			"id" : "react_codegen_RNCGeolocationSpec::@1b959fcb56e23f7716ba"
 		},
 		{
 			"backtrace" : 4,

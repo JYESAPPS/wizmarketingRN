@@ -22,6 +22,8 @@ android {
     targetSdkVersion rootProject.ext.targetSdkVersion
     versionCode 1
     versionName "1.0"
+    buildConfigField "String", "KAKAO_NATIVE_APP_KEY", "\"${project.findProperty('KAKAO_NATIVE_APP_KEY') ?: ""}\""
+
   }
 
   signingConfigs {
@@ -56,6 +58,7 @@ android {
 }
 
 dependencies {
+
   implementation("com.facebook.react:react-android")
   if (hermesEnabled.toBoolean()) {
     implementation("com.facebook.react:hermes-android")
@@ -63,6 +66,7 @@ dependencies {
     implementation jscFlavor
   }
   implementation(platform("com.google.firebase:firebase-bom:33.3.0"))
+  implementation "com.kakao.sdk:v2-user:2.20.6"   // 최신 가능
 }
 
 apply plugin: "com.google.gms.google-services" // 맨 아래 OK

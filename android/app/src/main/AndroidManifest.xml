@@ -1,11 +1,14 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
-
+    <queries>
+      <package android:name="com.kakao.talk" />
+    </queries>
 
     <uses-permission android:name="android.permission.INTERNET" />
 
     <!-- Android 13+ 알림 권한 (푸시용) -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
+  
 
     <application
       android:name=".MainApplication"
@@ -25,6 +28,13 @@
         <intent-filter>
             <action android:name="android.intent.action.MAIN" />
             <category android:name="android.intent.category.LAUNCHER" />
+            <category android:name="android.intent.category.DEFAULT"/>
+            <category android:name="android.intent.category.BROWSABLE"/>
+            <action android:name="android.intent.action.VIEW"/>
+      
+            <data
+            android:scheme="kakaodeadbeefdeadbeefdeadbeefdeadbeef"  
+            android:host="oauth" />
         </intent-filter>
       </activity>
     </application>

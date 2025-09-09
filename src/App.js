@@ -20,7 +20,9 @@ import { GoogleSignin } from '@react-native-google-signin/google-signin';
 import { SafeAreaProvider, SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import SplashScreenRN from './SplashScreenRN';
 
-import KakaoLogins from '@react-native-seoul/kakao-login';
+import { NativeModules } from 'react-native';
+const { KakaoLoginModule } = NativeModules;
+
 
 const APP_VERSION = '1.0.0';
 const BOOT_TIMEOUT_MS = 8000;
@@ -213,29 +215,43 @@ const App = () => {
 
       /** ────────────── Kakao 로그인 ────────────── */
       if (provider === 'kakao') {
-        try { await KakaoLogins.logout(); } catch { }
-        try { await KakaoLogins.unlink(); } catch { }
+        try {
+          // 1. (선택) 키해시 찍어보기
+          const keyHash = await KakaoLoginModule.getKeyHash();
+          console.log('[KAKAO] keyHash =', keyHash);
 
-        const { accessToken, refreshToken } = await KakaoLogins.login();
-        const profile = await KakaoLogins.getProfile();
+          // 2. 로그인 호출
+          const res = await KakaoLoginModule.login();
+          // {accessToken, refreshToken, id, email, nickname, photoURL}
 
-        safeSend('SIGNIN_RESULT', {
-          success: true,
-          provider: 'kakao',
-          user: {
-            provider_id: String(profile?.id),
-            email: profile?.email || '',
-            displayName: profile?.nickname || '',
-            photoURL: profile?.profileImageUrl || '',
-          },
-          tokens: {
-            access_token: accessToken,
-            refresh_token: refreshToken || '',
-          },
-          expires_at: Date.now() + 6 * 3600 * 1000,
-        });
-        return;
+          safeSend('SIGNIN_RESULT', {
+            success: true,
+            provider: 'kakao',
+            user: {
+              provider_id: String(res.id),
+              email: res.email || '',
+              displayName: res.nickname || '',
+              photoURL: res.photoURL || '',
+            },
+            tokens: {
+              access_token: res.accessToken,
+              refresh_token: res.refreshToken || '',
+            },
+            expires_at: Date.now() + 6 * 3600 * 1000,
+          });
+          return;
+        } catch (err) {
+          console.log('[KAKAO LOGIN ERROR]', err);
+          safeSend('SIGNIN_RESULT', {
+            success: false,
+            provider: 'kakao',
+            error_code: err?.code || 'kakao_error',
+            error_message: err?.message || String(err),
+          });
+          return;
+        }
       }
+
 
       throw new Error('unsupported_provider');
     } catch (err) {
@@ -257,7 +273,7 @@ const App = () => {
       });
     }
   }, [sendToWeb]);
-  
+
   // const handleStartSignin = useCallback(async (payload) => {
   //   const provider = payload?.provider;
   //   try {

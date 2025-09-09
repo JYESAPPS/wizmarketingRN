@@ -262,14 +262,6 @@
 	[
 		{
 			"backtrace" : 4,
-			"id" : "react_codegen_RNCGeolocationSpec::@1b959fcb56e23f7716ba"
-		},
-		{
-			"backtrace" : 4,
-			"id" : "react_codegen_RNGoogleSignInCGen::@337b7b353bd94a4215c0"
-		},
-		{
-			"backtrace" : 4,
 			"id" : "react_codegen_safeareacontext::@7984cd80db47aa7b952a"
 		},
 		{
@@ -279,6 +271,14 @@
 		{
 			"backtrace" : 4,
 			"id" : "react_codegen_RNCWebViewSpec::@eb48929f9f7453740a6c"
+		},
+		{
+			"backtrace" : 4,
+			"id" : "react_codegen_RNCGeolocationSpec::@1b959fcb56e23f7716ba"
+		},
+		{
+			"backtrace" : 4,
+			"id" : "react_codegen_RNGoogleSignInCGen::@337b7b353bd94a4215c0"
 		}
 	],
 	"id" : "appmodules::@6890427a1f51a3e7e1df",
