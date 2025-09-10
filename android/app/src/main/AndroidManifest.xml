@@ -24,18 +24,26 @@
         android:launchMode="singleTask"
         android:windowSoftInputMode="adjustResize"
         android:screenOrientation ="portrait"
+        android:theme="@style/SplashTheme"
         android:exported="true">
+ 
+
+        <!-- A. 런처(앱 실행) 용 -->
         <intent-filter>
-            <action android:name="android.intent.action.MAIN" />
-            <category android:name="android.intent.category.LAUNCHER" />
-            <category android:name="android.intent.category.DEFAULT"/>
-            <category android:name="android.intent.category.BROWSABLE"/>
-            <action android:name="android.intent.action.VIEW"/>
-      
-            <data
-            android:scheme="kakaodeadbeefdeadbeefdeadbeefdeadbeef"  
-            android:host="oauth" />
+          <action android:name="android.intent.action.MAIN" />
+          <category android:name="android.intent.category.LAUNCHER" />
         </intent-filter>
+
+        <!-- B. 카카오 로그인 리다이렉트 용 -->
+        <intent-filter>
+          <action android:name="android.intent.action.VIEW"/>
+          <category android:name="android.intent.category.DEFAULT"/>
+          <category android:name="android.intent.category.BROWSABLE"/>
+          <data
+          android:scheme="kakao8343bf6b962ad0d26c5f7636ee2e0861"
+          android:host="oauth"/>
+        </intent-filter>
+
       </activity>
     </application>
 </manifest>

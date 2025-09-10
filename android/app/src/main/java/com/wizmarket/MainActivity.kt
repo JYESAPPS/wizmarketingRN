@@ -1,7 +1,10 @@
 package com.wizmarket
 
-import android.util.Log
-import android.webkit.WebView
+import android.os.Build
+import android.os.Bundle
+import android.view.View
+import android.view.WindowInsetsController
+import androidx.core.content.ContextCompat
 import com.facebook.react.ReactActivity
 import com.facebook.react.ReactActivityDelegate
 import com.facebook.react.defaults.DefaultNewArchitectureEntryPoint.fabricEnabled
@@ -13,44 +16,43 @@ class MainActivity : ReactActivity() {
     private const val TAG = "BackTrace"
   }
 
-
-  override fun getMainComponentName(): String = "wizmarket"
+  override fun getMainComponentName(): String = "wizmarket" // JS App 이름과 동일하게
 
   override fun createReactActivityDelegate(): ReactActivityDelegate =
-      DefaultReactActivityDelegate(this, mainComponentName, fabricEnabled)
+          DefaultReactActivityDelegate(this, mainComponentName, fabricEnabled)
 
-  // 하드웨어 뒤로가기 → 포커스가 WebView면 JS로 BACK_PRESSED 먼저 전달
-  // override fun onBackPressed() {
-  //   try {
-  //     // 현재 포커스를 가진 뷰 중 WebView인 경우만 처리
-  //     val focusedView = currentFocus
+  override fun onCreate(savedInstanceState: Bundle?) {
+    // 스플래시 테마에서 AppTheme로 전환
+    setTheme(R.style.AppTheme)
+    super.onCreate(savedInstanceState)
 
-  //     Log.d(TAG, "onBackPressed() focused=${focusedView?.javaClass?.name}");
+    // 상태바/네비게이션 바 흰색 강제
+    val white = ContextCompat.getColor(this, android.R.color.white)
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+      window.statusBarColor = white
+      window.navigationBarColor = white
+    }
 
-  //     if (focusedView is WebView) {
-  //       // JS로 BACK_PRESSED 메시지 전달
-  //       focusedView.evaluateJavascript(
-  //         """
-  //           window.dispatchEvent(new MessageEvent('message', {
-  //             data: JSON.stringify({ type: 'BACK_PRESSED' })
-  //           }));
-  //         """.trimIndent(),
-  //         null
-  //       )
-  //       Log.d(TAG, "onBackPressed(): return (prevent default)")
-  //       return // ✅ Web에게 맡겼으므로 기본 동작 안함
-  //     }
-  //   } catch (e: Exception) {
-  //     e.printStackTrace()
-  //   }
-
-
-  //   // ✅ WebView를 못 찾았으면 기본 동작 수행 (예: 백그라운드로 이동)
-  //   Log.d(TAG, "onBackPressed(): not WebView → super")
-  //   super.onBackPressed()
-  // }
+    // 아이콘 색상도 밝은 배경에 맞게 어둡게 설정
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+      window.insetsController?.setSystemBarsAppearance(
+              WindowInsetsController.APPEARANCE_LIGHT_STATUS_BARS or
+                      WindowInsetsController.APPEARANCE_LIGHT_NAVIGATION_BARS,
+              WindowInsetsController.APPEARANCE_LIGHT_STATUS_BARS or
+                      WindowInsetsController.APPEARANCE_LIGHT_NAVIGATION_BARS
+      )
+    } else {
+      @Suppress("DEPRECATION")
+      window.decorView.systemUiVisibility =
+              (window.decorView.systemUiVisibility or
+                      View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR or
+                      (if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O)
+                              View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR
+                      else 0))
+    }
+  }
 
   override fun onBackPressed() {
-    super.onBackPressed()  // RN BackHandler로 이벤트 전달
+    super.onBackPressed() // RN BackHandler로 이벤트 전달
   }
 }
