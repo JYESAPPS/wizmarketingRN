@@ -56,26 +56,82 @@ const SOCIAL_MAP = {
 
 
 
+
 function buildFinalText({ caption, hashtags = [], couponEnabled = false, link } = {}) {
   const tags = Array.isArray(hashtags) ? hashtags.join(' ') : (hashtags || '');
   return `${caption || ''}${tags ? `\n\n${tags}` : ''}${couponEnabled ? `\n\n✅ 민생회복소비쿠폰` : ''}${link ? `\n${link}` : ''}`.trim();
 }
 
-function guessExt(url = '') { const u = url.toLowerCase(); if (u.includes('.png')) return 'png'; if (u.includes('.webp')) return 'webp'; if (u.includes('.gif')) return 'gif'; return 'jpg'; }
-function extToMime(ext) { return ext === 'png' ? 'image/png' : ext === 'webp' ? 'image/webp' : ext === 'gif' ? 'image/gif' : 'image/jpeg'; }
-async function ensureLocalFile(url, social) {
-  if (!url) return url;
-  const needsLocal = [Share.Social.INSTAGRAM, Share.Social.INSTAGRAM_STORIES, Share.Social.FACEBOOK].includes(social);
-  if (!needsLocal || /^file:\/\//i.test(url) || /^data:/i.test(url)) return url;
-  try {
-    const ext = guessExt(url);
-    const toFile = `${RNFS.CachesDirectoryPath}/share_${Date.now()}.${ext}`;
-    const r = await RNFS.downloadFile({ fromUrl: url, toFile }).promise;
-    if (r.statusCode >= 200 && r.statusCode < 300) return `file://${toFile}`;
-  } catch { }
+
+
+// 내부→외부 캐시 폴백 + 존재/사이즈 검증 + 상세 로그
+async function ensureLocalFile(url, socialTag = 'KAKAO') {
+  if (!url || /^file:\/\//i.test(url) || /^data:/i.test(url)) return url;
+
+  const ext = guessExt(url);
+  const tryPaths = [];
+
+  // 1차: 내부 캐시
+  tryPaths.push(`${RNFS.CachesDirectoryPath}/share_${Date.now()}.${ext}`);
+  // 2차: 외부 캐시(안드 전용) — 일부 기기 카톡이 내부 캐시 못 읽는 케이스
+  if (Platform.OS === 'android' && RNFS.ExternalCachesDirectoryPath) {
+    tryPaths.push(`${RNFS.ExternalCachesDirectoryPath}/share_${Date.now()}.${ext}`);
+  }
+
+  for (const toFile of tryPaths) {
+    try {
+      const res = await downloadTo(url, toFile);
+      // statusCode 검증
+      if (!(res && res.statusCode >= 200 && res.statusCode < 300)) {
+        console.log('[DL][fail]', socialTag, res?.statusCode, '→', toFile);
+        continue;
+      }
+      // 존재/사이즈 검증
+      try {
+        const st = await RNFS.stat(toFile);
+        if (st.isFile() && Number(st.size) > 0) {
+          const local = `file://${toFile}`;
+          console.log('[DL][ok]', socialTag, '→', local, 'size=', st.size);
+          return local;
+        }
+        console.log('[DL][stat-zero]', socialTag, toFile, st.size);
+      } catch (e) {
+        console.log('[DL][stat-err]', socialTag, toFile, String(e?.message || e));
+      }
+    } catch (e) {
+      console.log('[DL][err]', socialTag, toFile, String(e?.message || e));
+    }
+  }
+
+  // 모두 실패 → 원본 URL 반환(이미지 없이 갈 수 있음)
   return url;
 }
 
+
+function guessExt(u = '') { u = u.toLowerCase(); if (u.includes('.png')) return 'png'; if (u.includes('.webp')) return 'webp'; if (u.includes('.gif')) return 'gif'; return 'jpg'; }
+function extToMime(e) { return e === 'png' ? 'image/png' : e === 'webp' ? 'image/webp' : 'image/jpeg'; }
+
+
+
+async function toBase64DataUrl(srcUrl) {
+  const ext = guessExt(srcUrl);
+  const local = `${RNFS.CachesDirectoryPath}/share_${Date.now()}.${ext}`;
+  const r = await RNFS.downloadFile({ fromUrl: srcUrl, toFile: local }).promise;
+  if (!(r.statusCode >= 200 && r.statusCode < 300)) throw new Error(`download ${r.statusCode}`);
+  const bin = await RNFS.readFile(local, 'base64');
+  return { dataUrl: `data:${extToMime(ext)};base64,${bin}`, ext };
+}
+
+function safeStr(x) {
+  if (typeof x === 'string') return x;
+  if (x == null) return '';
+  try { return String(x); } catch { return ''; }
+}
+function stripImageUrlsFromText(text) {
+  const s = safeStr(text);
+  const out = s.replace(/https?:\/\/\S+\.(?:png|jpe?g|webp|gif)(?:\?\S*)?/gi, '');
+  return out.replace(/[ \t]{2,}/g, ' ').trim();
+}
 
 
 async function handleShareToChannel(payload, sendToWeb) {
@@ -93,6 +149,59 @@ async function handleShareToChannel(payload, sendToWeb) {
     file = await ensureLocalFile(file, social);
     const ext = (file.match(/\.(png|jpg|jpeg|webp|gif)(\?|$)/i)?.[1] || guessExt(file)).toLowerCase();
     const mime = extToMime(ext);
+
+    // ✅ KakaoTalk: 로컬 파일을 보장하고, 본문에서 이미지 URL은 제거
+    // Kakao 분기 (교체)
+
+    console.log('[KAKAO][enter 전]', { ts: Date.now() });
+
+    const key = (payload?.social || '').toUpperCase();
+    console.log('[KAKAO][enter 전]', { ts: Date.now(), key });
+
+    // helpers가 없다면 위쪽에 한번만
+
+    // 🔒 KAKAO 분기 — 어디서 멈추는지 잡는 가드 로그 + 즉시 우회(dataURL) 포함
+    if (key === 'KAKAO') {
+      const src = data.imageUrl || data.url || data.image;
+
+      // 텍스트 준비 (이미지 URL 제거)
+      const cleanText = safeStr(text);
+      const pasteText = stripImageUrlsFromText(cleanText);
+
+      // 1) 파일 다운로드 (이미 해오던 것 그대로)
+      const kExt = guessExt(src);
+      const dlPath = `${RNFS.CachesDirectoryPath}/share_${Date.now()}.${kExt}`;
+      const r = await RNFS.downloadFile({ fromUrl: src, toFile: dlPath }).promise;
+      if (!(r && r.statusCode >= 200 && r.statusCode < 300)) {
+        throw new Error(`download ${r?.statusCode || 'fail'}`);
+      }
+      const st = await RNFS.stat(dlPath);
+      if (!st.isFile() || Number(st.size) <= 0) throw new Error('downloaded-file-empty');
+
+      const fileUrl = `file://${dlPath}`;
+      const kMime = extToMime(kExt);
+
+      // 디버그 로그
+      console.log('[KAKAO][share:file]', { fileUrl, kMime, size: st.size, msgLen: pasteText.length });
+
+      // 2) 카카오톡 공유 (파일 경로 + 텍스트)
+      //    ⚠️ dataUrl은 사용하지 않음 (일부 기기에서 NPE)
+      await Share.open({
+        title: '카카오톡으로 공유',
+        url: fileUrl,               // ← file:// 경로 직접 전달
+        type: kMime,                // image/jpeg 등
+        filename: `share.${kExt}`,
+        message: pasteText,         // 텍스트 함께 전달 (형 기기에서 OK)
+        failOnCancel: false,
+      });
+
+      sendToWeb('SHARE_RESULT', { success: true, platform: key, post_id: null });
+      return;
+    }
+
+
+
+
 
     if (social === Share.Social.INSTAGRAM_STORIES) {
       await Share.shareSingle({ social, backgroundImage: file, attributionURL: data.link, failOnCancel: false });

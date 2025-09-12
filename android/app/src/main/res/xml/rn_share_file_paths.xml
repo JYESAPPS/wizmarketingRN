@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<paths>
+    <!-- RNFS.CachesDirectoryPath -->
+    <cache-path name="cache" path="." />
+    <!-- RNFS.DocumentDirectoryPath 같은 내부 파일 -->
+    <files-path name="files" path="." />
+    <!-- 외부 캐시 -->
+    <external-cache-path name="external_cache" path="." />
+    <!-- 필요시: <external-files-path name="external_files" path="." /> -->
+</paths>
