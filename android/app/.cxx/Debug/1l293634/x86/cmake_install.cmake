@@ -44,6 +44,7 @@ endif()
 
 if(NOT CMAKE_INSTALL_LOCAL_ONLY)
   # Include the install script for each subdirectory.
+  include("/Users/sungwon/Downloads/Develop/Mobile/wizmarketingRN/android/app/.cxx/Debug/1l293634/x86/rnclipboard_autolinked_build/cmake_install.cmake")
   include("/Users/sungwon/Downloads/Develop/Mobile/wizmarketingRN/android/app/.cxx/Debug/1l293634/x86/RNCGeolocationSpec_autolinked_build/cmake_install.cmake")
   include("/Users/sungwon/Downloads/Develop/Mobile/wizmarketingRN/android/app/.cxx/Debug/1l293634/x86/RNGoogleSignInCGen_autolinked_build/cmake_install.cmake")
   include("/Users/sungwon/Downloads/Develop/Mobile/wizmarketingRN/android/app/.cxx/Debug/1l293634/x86/safeareacontext_autolinked_build/cmake_install.cmake")

@@ -1,7 +1,8 @@
-// App.js — WizMarketing WebView Bridge (push + auth: Google live / Apple&Kakao mock + SafeArea fix)
+// App.js — WizMarketing WebView Bridge (push + auth: Google live / Apple&Kakao mock + SafeArea fix + Channel Share)
 // deps: react-native-webview, @react-native-firebase/messaging, @notifee/react-native, react-native-share
 // + auth deps: @react-native-google-signin/google-signin, @react-native-firebase/auth
 // + ui deps: react-native-safe-area-context
+// + share deps: rn-fetch-blob, @react-native-clipboard/clipboard
 
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import '@react-native-firebase/app';
@@ -14,6 +15,11 @@ import messaging from '@react-native-firebase/messaging';
 import notifee from '@notifee/react-native';
 import Share from 'react-native-share';
 
+import Clipboard from '@react-native-clipboard/clipboard';
+
+import RNFS from 'react-native-fs';
+
+
 import auth from '@react-native-firebase/auth';
 import { GoogleSignin } from '@react-native-google-signin/google-signin';
 
@@ -23,7 +29,6 @@ import SplashScreenRN from './SplashScreenRN';
 import { NativeModules } from 'react-native';
 const { KakaoLoginModule } = NativeModules;
 
-
 const APP_VERSION = '1.0.0';
 const BOOT_TIMEOUT_MS = 8000;
 const MIN_SPLASH_MS = 1200;
@@ -31,9 +36,111 @@ const TAG = '[WizApp]';
 
 // ─────────── Google Sign-In 초기화 ───────────
 GoogleSignin.configure({
-  webClientId: '266866879152-kfquq1i6r89tbqeramjjuaa2csmoegej.apps.googleusercontent.com', // 🔑 복사한 web client ID
+  webClientId: '266866879152-kfquq1i6r89tbqeramjjuaa2csmoegej.apps.googleusercontent.com',
   offlineAccess: true,
 });
+
+// ─────────── 공유 유틸/매핑 ───────────
+const SOCIAL = Share.Social;
+const SOCIAL_MAP = {
+  INSTAGRAM: SOCIAL.INSTAGRAM,
+  INSTAGRAM_STORIES: SOCIAL.INSTAGRAM_STORIES,
+  FACEBOOK: SOCIAL.FACEBOOK,
+  TWITTER: SOCIAL.TWITTER,
+  SMS: SOCIAL.SMS,
+  // shareSingle 미지원 → 폴백 처리
+  KAKAO: 'KAKAO',
+  NAVER: 'NAVER',
+  SYSTEM: 'SYSTEM',
+};
+
+
+
+function buildFinalText({ caption, hashtags = [], couponEnabled = false, link } = {}) {
+  const tags = Array.isArray(hashtags) ? hashtags.join(' ') : (hashtags || '');
+  return `${caption || ''}${tags ? `\n\n${tags}` : ''}${couponEnabled ? `\n\n✅ 민생회복소비쿠폰` : ''}${link ? `\n${link}` : ''}`.trim();
+}
+
+// 인스타/페북 등 '로컬 파일'을 요구하는 채널만 로컬로 저장
+async function ensureLocalFileForChannel(url, social) {
+  if (!url) return url;
+
+  const needsLocal = [
+    Share.Social.INSTAGRAM,
+    Share.Social.INSTAGRAM_STORIES,
+    Share.Social.FACEBOOK,
+  ].includes(social);
+
+  // 이미 로컬이면 그대로 사용
+  if (!needsLocal || /^file:\/\//i.test(url) || /^data:/i.test(url)) return url;
+
+  // 원격 URL → 임시 파일 저장
+  try {
+    const ext =
+      /(\.png)(\?|$)/i.test(url) ? 'png' :
+        /(\.webp)(\?|$)/i.test(url) ? 'webp' : 'jpg';
+    const localPath = `${RNFS.CachesDirectoryPath}/share_${Date.now()}.${ext}`;
+    const res = await RNFS.downloadFile({ fromUrl: url, toFile: localPath }).promise;
+    // res.statusCode === 200 확인 가능
+    return `file://${localPath}`;
+  } catch {
+    // 실패 시 원본 URL 그대로 반환(마지막 폴백)
+    return url;
+  }
+}
+
+async function handleShareToChannel(payload, sendToWeb) {
+  const key = payload?.social;
+  const data = payload?.data || {};
+  const social = SOCIAL_MAP[key] ?? SOCIAL_MAP.SYSTEM;
+
+  const text = buildFinalText(data);
+
+  let file = data.imageUrl || data.url || data.image;
+
+  try {
+    // 인스타/페북류: 캡션 자동 주입 제한 → 클립보드 선복사
+    const needClipboard = [Share.Social.INSTAGRAM, Share.Social.INSTAGRAM_STORIES, Share.Social.FACEBOOK].includes(social);
+    if (needClipboard && text) {
+      Clipboard.setString(text);
+      sendToWeb('TOAST', { message: '캡션이 복사되었어요. 업로드 화면에서 붙여넣기 하세요.' });
+    }
+
+      // 🔴 중요: 해당 채널이 로컬 파일을 요구하면, 원격 URL을 로컬로 저장
+       file = await ensureLocalFileForChannel(file, social);
+
+    // 지원되는 소셜은 shareSingle 시도
+    if (typeof social === 'string' && social !== 'SYSTEM' && social !== 'KAKAO' && social !== 'NAVER') {
+    await Share.shareSingle({
+        social,
+        url: file,                                // 이제 file:// 경로
+        message: needClipboard ? undefined : text,
+        failOnCancel: false,
+      });
+    sendToWeb('SHARE_RESULT', { success: true, platform: key, post_id: null });
+    return;
+  }
+
+    // KAKAO/NAVER/SYSTEM: 시스템 공유 시트
+
+  await Share.open({ url: file, message: text, title: '공유', failOnCancel: false });
+  sendToWeb('SHARE_RESULT', { success: true, platform: key, post_id: null });
+} catch (err) {
+  // 폴백 1: 이미지 없이 텍스트만 공유 시트
+  try {
+     await Share.open({ message: text, title: '공유', failOnCancel: false });
+    sendToWeb('SHARE_RESULT', { success: true, platform: key, post_id: null });
+  } catch (e2) {
+    sendToWeb('SHARE_RESULT', {
+      success: false,
+      platform: key,
+      error_code: 'share_failed',
+      message: String(err?.message || err),
+    });
+  }
+}
+}
+
 
 const App = () => {
   const webViewRef = useRef(null);
@@ -45,13 +152,9 @@ const App = () => {
   const bootTORef = useRef(null);
   const [token, setToken] = useState('');
 
-  const lastNavRef = useRef({ isRoot: false, path: '/', canGoBack: false });
   const lastNavStateRef = useRef({}); // 웹 라우팅 상태 저장
 
   useEffect(() => { LogBox.ignoreAllLogs(true); }, []);
-
-
-
 
   // ─────────── Web으로 메시지 보내기 ───────────
   const sendToWeb = useCallback((type, payload = {}) => {
@@ -61,6 +164,27 @@ const App = () => {
       if (__DEV__) console.log('📡 to Web:', msg);
     } catch (e) { console.log('❌ postMessage error:', e); }
   }, []);
+
+  // ─────────── Splash helpers (정의 순서 주의) ───────────
+  const hideSplashRespectingMin = useCallback(() => {
+    const elapsed = Date.now() - (splashStartRef.current || Date.now());
+    const wait = Math.max(MIN_SPLASH_MS - elapsed, 0);
+    setTimeout(() => {
+      Animated.timing(splashFade, {
+        toValue: 0, duration: 300, easing: Easing.out(Easing.quad), useNativeDriver: true,
+      }).start(() => setSplashVisible(false));
+    }, wait);
+  }, [splashFade]);
+
+  const showSplashOnce = useCallback(() => {
+    if (!splashVisible) {
+      setSplashVisible(true);
+      splashFade.setValue(1);
+      splashStartRef.current = Date.now();
+    } else if (!splashStartRef.current) {
+      splashStartRef.current = Date.now();
+    }
+  }, [splashFade, splashVisible]);
 
   // ─────────── HW Back 처리 ───────────
   useEffect(() => {
@@ -160,7 +284,6 @@ const App = () => {
     return () => unsubscribe();
   }, [sendToWeb]);
 
-
   // 안전하게 sendToWeb 감싸는 함수
   const safeSend = (type, payload) => {
     try {
@@ -170,35 +293,26 @@ const App = () => {
     }
   };
 
+  // ─────────── Auth: Sign-in/out ───────────
   const handleStartSignin = useCallback(async (payload) => {
     const provider = payload?.provider;
     try {
       /** ────────────── Google 로그인 ────────────── */
       if (provider === 'google') {
-        // A. 환경 체크
         await GoogleSignin.hasPlayServices({ showPlayServicesUpdateDialog: true });
-
-        // B. 세션 초기화
         try { await GoogleSignin.signOut(); } catch { }
         try { await GoogleSignin.revokeAccess(); } catch { }
-
-        // C. 로그인
         const res = await GoogleSignin.signIn(); // { idToken, user, ... }
         let idToken = res?.idToken;
-
-        // D. 혹시 여전히 비어있으면 토큰 직접 획득
         if (!idToken) {
           try {
             const tokens = await GoogleSignin.getTokens(); // { idToken, accessToken }
             idToken = tokens?.idToken || null;
           } catch { }
         }
-
         if (!idToken) throw new Error('no_id_token');
-
         const googleCredential = auth.GoogleAuthProvider.credential(idToken);
         const userCred = await auth().signInWithCredential(googleCredential);
-
         safeSend('SIGNIN_RESULT', {
           success: true,
           provider: 'google',
@@ -216,14 +330,9 @@ const App = () => {
       /** ────────────── Kakao 로그인 ────────────── */
       if (provider === 'kakao') {
         try {
-          // 1. (선택) 키해시 찍어보기
           const keyHash = await KakaoLoginModule.getKeyHash();
           console.log('[KAKAO] keyHash =', keyHash);
-
-          // 2. 로그인 호출
-          const res = await KakaoLoginModule.login();
-          // {accessToken, refreshToken, id, email, nickname, photoURL}
-
+          const res = await KakaoLoginModule.login(); // {accessToken, refreshToken, id, email, nickname, photoURL}
           safeSend('SIGNIN_RESULT', {
             success: true,
             provider: 'kakao',
@@ -252,19 +361,15 @@ const App = () => {
         }
       }
 
-
       throw new Error('unsupported_provider');
     } catch (err) {
       console.log('[LOGIN ERROR raw]', err, 'type=', typeof err);
-
       const code =
         (err && typeof err === 'object' && 'code' in err) ? err.code :
           (String(err?.message || '').includes('no_id_token') ? 'no_id_token' : 'unknown_error');
-
       const msg =
         (err && typeof err === 'object' && 'message' in err && err.message) ||
         (typeof err === 'string' ? err : JSON.stringify(err));
-
       safeSend('SIGNIN_RESULT', {
         success: false,
         provider,
@@ -273,68 +378,6 @@ const App = () => {
       });
     }
   }, [sendToWeb]);
-
-  // const handleStartSignin = useCallback(async (payload) => {
-  //   const provider = payload?.provider;
-  //   try {
-  //     if (provider !== 'google') throw new Error('unsupported provider');
-
-  //     // A. 환경 체크
-  //     await GoogleSignin.hasPlayServices({ showPlayServicesUpdateDialog: true });
-
-  //     // B. 세션 초기화(안전)
-  //     try { await GoogleSignin.signOut(); } catch { }
-  //     try { await GoogleSignin.revokeAccess(); } catch { }
-
-  //     // C. 로그인
-  //     const res = await GoogleSignin.signIn(); // { idToken, user, ... }
-  //     let idToken = res?.idToken;
-
-  //     // D. 혹시 여전히 비어있으면 토큰 직접 획득
-  //     if (!idToken) {
-  //       try {
-  //         const tokens = await GoogleSignin.getTokens(); // { idToken, accessToken }
-  //         idToken = tokens?.idToken || null;
-  //       } catch { }
-  //     }
-
-  //     if (!idToken) throw new Error('no_id_token'); // 여전히 없으면 명확히 실패 처리
-
-  //     const googleCredential = auth.GoogleAuthProvider.credential(idToken);
-  //     const userCred = await auth().signInWithCredential(googleCredential);
-
-  //     safeSend('SIGNIN_RESULT', {
-  //       success: true,
-  //       provider: 'google',
-  //       user: {
-  //         uid: userCred.user.uid,
-  //         email: userCred.user.email,
-  //         displayName: userCred.user.displayName,
-  //         photoURL: userCred.user.photoURL,
-  //       },
-  //       expires_at: Date.now() + 6 * 3600 * 1000,
-  //     });
-  //   } catch (err) {
-  //     console.log('[LOGIN ERROR raw]', err, 'type=', typeof err);
-
-  //     const code =
-  //       (err && typeof err === 'object' && 'code' in err) ? err.code :
-  //         (String(err?.message || err).includes('no_id_token') ? 'no_id_token' : 'unknown_error');
-
-  //     const msg =
-  //       (err && typeof err === 'object' && 'message' in err && err.message) ||
-  //       (typeof err === 'string' ? err : JSON.stringify(err));
-
-  //     safeSend('SIGNIN_RESULT', {
-  //       success: false,
-  //       provider: 'google',
-  //       error_code: code,
-  //       error_message: msg,
-  //     });
-  //   }
-  // }, [sendToWeb]);
-
-  
 
   const handleStartSignout = useCallback(async () => {
     try {
@@ -378,6 +421,7 @@ const App = () => {
 
         case 'START_SUBSCRIPTION': await handleStartSubscription(data.payload); break;
 
+        // 기존 시스템 공유 시트
         case 'START_SHARE': {
           try {
             const { image, caption, platform } = data.payload || {};
@@ -395,6 +439,12 @@ const App = () => {
               message: String(err?.message || err),
             });
           }
+          break;
+        }
+
+        // NEW: 채널 지정 공유 (웹 바텀시트 → RN)
+        case 'share.toChannel': {
+          await handleShareToChannel(data, sendToWeb);
           break;
         }
 
@@ -441,27 +491,7 @@ const App = () => {
     } catch (err) { console.error('❌ onMessage error:', err); }
   }, [handleCheckPermission, handleRequestPermission, handleStartSignin, handleStartSignout, handleWebError, handleWebReady, sendToWeb]);
 
-  // ─────────── Splash / WebView ───────────
-  const showSplashOnce = useCallback(() => {
-    if (!splashVisible) {
-      setSplashVisible(true);
-      splashFade.setValue(1);
-      splashStartRef.current = Date.now();
-    } else if (!splashStartRef.current) {
-      splashStartRef.current = Date.now();
-    }
-  }, [splashFade, splashVisible]);
-
-  const hideSplashRespectingMin = useCallback(() => {
-    const elapsed = Date.now() - (splashStartRef.current || Date.now());
-    const wait = Math.max(MIN_SPLASH_MS - elapsed, 0);
-    setTimeout(() => {
-      Animated.timing(splashFade, {
-        toValue: 0, duration: 300, easing: Easing.out(Easing.quad), useNativeDriver: true,
-      }).start(() => setSplashVisible(false));
-    }, wait);
-  }, [splashFade]);
-
+  // ─────────── WebView 로딩 이벤트 ───────────
   const onWebViewLoadStart = useCallback(() => {
     showSplashOnce();
     if (bootTORef.current) clearTimeout(bootTORef.current);

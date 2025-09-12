@@ -1,0 +1,213 @@
+{
+	"configurations" : 
+	[
+		{
+			"directories" : 
+			[
+				{
+					"build" : ".",
+					"childIndexes" : 
+					[
+						1,
+						2,
+						3,
+						4,
+						5,
+						6
+					],
+					"jsonFile" : "directory-.-Debug-f5ebdc15457944623624.json",
+					"minimumCMakeVersion" : 
+					{
+						"string" : "3.13"
+					},
+					"projectIndex" : 0,
+					"source" : ".",
+					"targetIndexes" : 
+					[
+						0
+					]
+				},
+				{
+					"build" : "rnclipboard_autolinked_build",
+					"jsonFile" : "directory-rnclipboard_autolinked_build-Debug-34d2558cb77fc70a49a0.json",
+					"minimumCMakeVersion" : 
+					{
+						"string" : "3.13"
+					},
+					"parentIndex" : 0,
+					"projectIndex" : 0,
+					"source" : "/Users/sungwon/Downloads/Develop/Mobile/wizmarketingRN/node_modules/@react-native-clipboard/clipboard/android/build/generated/source/codegen/jni",
+					"targetIndexes" : 
+					[
+						5
+					]
+				},
+				{
+					"build" : "RNCGeolocationSpec_autolinked_build",
+					"jsonFile" : "directory-RNCGeolocationSpec_autolinked_build-Debug-0552ef4c242e217e3762.json",
+					"minimumCMakeVersion" : 
+					{
+						"string" : "3.13"
+					},
+					"parentIndex" : 0,
+					"projectIndex" : 0,
+					"source" : "/Users/sungwon/Downloads/Develop/Mobile/wizmarketingRN/node_modules/@react-native-community/geolocation/android/build/generated/source/codegen/jni",
+					"targetIndexes" : 
+					[
+						1
+					]
+				},
+				{
+					"build" : "RNGoogleSignInCGen_autolinked_build",
+					"jsonFile" : "directory-RNGoogleSignInCGen_autolinked_build-Debug-88549ed7c586faf350c6.json",
+					"minimumCMakeVersion" : 
+					{
+						"string" : "3.13"
+					},
+					"parentIndex" : 0,
+					"projectIndex" : 0,
+					"source" : "/Users/sungwon/Downloads/Develop/Mobile/wizmarketingRN/node_modules/@react-native-google-signin/google-signin/android/build/generated/source/codegen/jni",
+					"targetIndexes" : 
+					[
+						3
+					]
+				},
+				{
+					"build" : "safeareacontext_autolinked_build",
+					"jsonFile" : "directory-safeareacontext_autolinked_build-Debug-f701f14a9dd5f163d95e.json",
+					"minimumCMakeVersion" : 
+					{
+						"string" : "3.13"
+					},
+					"parentIndex" : 0,
+					"projectIndex" : 0,
+					"source" : "/Users/sungwon/Downloads/Develop/Mobile/wizmarketingRN/node_modules/react-native-safe-area-context/android/src/main/jni",
+					"targetIndexes" : 
+					[
+						6
+					]
+				},
+				{
+					"build" : "RNShareSpec_autolinked_build",
+					"jsonFile" : "directory-RNShareSpec_autolinked_build-Debug-377b01641b81d0d181f6.json",
+					"minimumCMakeVersion" : 
+					{
+						"string" : "3.13"
+					},
+					"parentIndex" : 0,
+					"projectIndex" : 0,
+					"source" : "/Users/sungwon/Downloads/Develop/Mobile/wizmarketingRN/node_modules/react-native-share/android/build/generated/source/codegen/jni",
+					"targetIndexes" : 
+					[
+						4
+					]
+				},
+				{
+					"build" : "RNCWebViewSpec_autolinked_build",
+					"jsonFile" : "directory-RNCWebViewSpec_autolinked_build-Debug-830317c73d8e23a05173.json",
+					"minimumCMakeVersion" : 
+					{
+						"string" : "3.13"
+					},
+					"parentIndex" : 0,
+					"projectIndex" : 0,
+					"source" : "/Users/sungwon/Downloads/Develop/Mobile/wizmarketingRN/node_modules/react-native-webview/android/build/generated/source/codegen/jni",
+					"targetIndexes" : 
+					[
+						2
+					]
+				}
+			],
+			"name" : "Debug",
+			"projects" : 
+			[
+				{
+					"directoryIndexes" : 
+					[
+						0,
+						1,
+						2,
+						3,
+						4,
+						5,
+						6
+					],
+					"name" : "appmodules",
+					"targetIndexes" : 
+					[
+						0,
+						1,
+						2,
+						3,
+						4,
+						5,
+						6
+					]
+				}
+			],
+			"targets" : 
+			[
+				{
+					"directoryIndex" : 0,
+					"id" : "appmodules::@6890427a1f51a3e7e1df",
+					"jsonFile" : "target-appmodules-Debug-54bdd8908eeab26c0aab.json",
+					"name" : "appmodules",
+					"projectIndex" : 0
+				},
+				{
+					"directoryIndex" : 2,
+					"id" : "react_codegen_RNCGeolocationSpec::@1b959fcb56e23f7716ba",
+					"jsonFile" : "target-react_codegen_RNCGeolocationSpec-Debug-ed9c0114c09a7b8ea4c4.json",
+					"name" : "react_codegen_RNCGeolocationSpec",
+					"projectIndex" : 0
+				},
+				{
+					"directoryIndex" : 6,
+					"id" : "react_codegen_RNCWebViewSpec::@eb48929f9f7453740a6c",
+					"jsonFile" : "target-react_codegen_RNCWebViewSpec-Debug-c141607149ad5c72db9c.json",
+					"name" : "react_codegen_RNCWebViewSpec",
+					"projectIndex" : 0
+				},
+				{
+					"directoryIndex" : 3,
+					"id" : "react_codegen_RNGoogleSignInCGen::@337b7b353bd94a4215c0",
+					"jsonFile" : "target-react_codegen_RNGoogleSignInCGen-Debug-4fd68ef64d56b6059fba.json",
+					"name" : "react_codegen_RNGoogleSignInCGen",
+					"projectIndex" : 0
+				},
+				{
+					"directoryIndex" : 5,
+					"id" : "react_codegen_RNShareSpec::@e6c4c2b5aedb2ea213b7",
+					"jsonFile" : "target-react_codegen_RNShareSpec-Debug-c13889a663eb6688e8d5.json",
+					"name" : "react_codegen_RNShareSpec",
+					"projectIndex" : 0
+				},
+				{
+					"directoryIndex" : 1,
+					"id" : "react_codegen_rnclipboard::@6385240493dfcaf22ab7",
+					"jsonFile" : "target-react_codegen_rnclipboard-Debug-0852c6d6c45dfa8bd397.json",
+					"name" : "react_codegen_rnclipboard",
+					"projectIndex" : 0
+				},
+				{
+					"directoryIndex" : 4,
+					"id" : "react_codegen_safeareacontext::@7984cd80db47aa7b952a",
+					"jsonFile" : "target-react_codegen_safeareacontext-Debug-1ae31b2d9a4b1f3a468e.json",
+					"name" : "react_codegen_safeareacontext",
+					"projectIndex" : 0
+				}
+			]
+		}
+	],
+	"kind" : "codemodel",
+	"paths" : 
+	{
+		"build" : "/Users/sungwon/Downloads/Develop/Mobile/wizmarketingRN/android/app/.cxx/Debug/1l293634/armeabi-v7a",
+		"source" : "/Users/sungwon/Downloads/Develop/Mobile/wizmarketingRN/node_modules/react-native/ReactAndroid/cmake-utils/default-app-setup"
+	},
+	"version" : 
+	{
+		"major" : 2,
+		"minor" : 3
+	}
+}

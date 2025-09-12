@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<network-security-config>
+  <!-- 디버그는 Metro(8081) 때문에 전면 허용 -->
+  <base-config cleartextTrafficPermitted="true">
+    <trust-anchors>
+      <certificates src="system" />
+      <certificates src="user" />
+    </trust-anchors>
+  </base-config>
+</network-security-config>

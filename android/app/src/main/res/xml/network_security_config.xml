@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<network-security-config>
+  <!-- 여기에 평문을 꼭 허용해야 하는 도메인만 한정적으로 -->
+  <!-- 기본은 HTTP 금지 -->
+  <base-config cleartextTrafficPermitted="false" />
+
+  <!-- wizmarket.ai 및 모든 서브도메인에 한해 HTTP 허용 -->
+  <domain-config cleartextTrafficPermitted="true">
+    <domain includeSubdomains="true">wizmarket.ai</domain>
+    <domain includeSubdomains="true">daum.net</domain>
+  </domain-config>
+</network-security-config>

@@ -105,3 +105,9 @@ git commit -m "feat(auth): 구글/카카오 로그인 브리지 구현 및 AuthM
 
 # 원격 main 브랜치로 푸시
 git push origin main
+
+jyes / 0622
+
+https://wizad-b69ee.web.app/
+
+http://www.wizmarket.ai:53003/ads/login/MA010120220808570604
