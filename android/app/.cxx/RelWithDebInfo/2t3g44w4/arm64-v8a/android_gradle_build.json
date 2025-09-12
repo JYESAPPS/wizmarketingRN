@@ -1,5 +1,6 @@
 {
   "buildFiles": [
+    "/Users/sungwon/Downloads/Develop/Mobile/wizmarketingRN/node_modules/@react-native-clipboard/clipboard/android/build/generated/source/codegen/jni/CMakeLists.txt",
     "/Users/sungwon/Downloads/Develop/Mobile/wizmarketingRN/node_modules/@react-native-community/geolocation/android/build/generated/source/codegen/jni/CMakeLists.txt",
     "/Users/sungwon/Downloads/Develop/Mobile/wizmarketingRN/node_modules/@react-native-google-signin/google-signin/android/build/generated/source/codegen/jni/CMakeLists.txt",
     "/Users/sungwon/Downloads/Develop/Mobile/wizmarketingRN/node_modules/react-native-safe-area-context/android/src/main/jni/CMakeLists.txt",
@@ -53,6 +54,11 @@
       "toolchain": "toolchain",
       "abi": "arm64-v8a",
       "artifactName": "react_codegen_RNShareSpec"
+    },
+    "react_codegen_rnclipboard::@6385240493dfcaf22ab7": {
+      "toolchain": "toolchain",
+      "abi": "arm64-v8a",
+      "artifactName": "react_codegen_rnclipboard"
     },
     "react_codegen_safeareacontext::@7984cd80db47aa7b952a": {
       "toolchain": "toolchain",

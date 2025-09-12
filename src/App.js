@@ -16,8 +16,8 @@ import notifee from '@notifee/react-native';
 import Share from 'react-native-share';
 
 import Clipboard from '@react-native-clipboard/clipboard';
-
 import RNFS from 'react-native-fs';
+
 
 
 import auth from '@react-native-firebase/auth';
@@ -61,33 +61,22 @@ function buildFinalText({ caption, hashtags = [], couponEnabled = false, link } 
   return `${caption || ''}${tags ? `\n\n${tags}` : ''}${couponEnabled ? `\n\n✅ 민생회복소비쿠폰` : ''}${link ? `\n${link}` : ''}`.trim();
 }
 
-// 인스타/페북 등 '로컬 파일'을 요구하는 채널만 로컬로 저장
-async function ensureLocalFileForChannel(url, social) {
+function guessExt(url = '') { const u = url.toLowerCase(); if (u.includes('.png')) return 'png'; if (u.includes('.webp')) return 'webp'; if (u.includes('.gif')) return 'gif'; return 'jpg'; }
+function extToMime(ext) { return ext === 'png' ? 'image/png' : ext === 'webp' ? 'image/webp' : ext === 'gif' ? 'image/gif' : 'image/jpeg'; }
+async function ensureLocalFile(url, social) {
   if (!url) return url;
-
-  const needsLocal = [
-    Share.Social.INSTAGRAM,
-    Share.Social.INSTAGRAM_STORIES,
-    Share.Social.FACEBOOK,
-  ].includes(social);
-
-  // 이미 로컬이면 그대로 사용
+  const needsLocal = [Share.Social.INSTAGRAM, Share.Social.INSTAGRAM_STORIES, Share.Social.FACEBOOK].includes(social);
   if (!needsLocal || /^file:\/\//i.test(url) || /^data:/i.test(url)) return url;
-
-  // 원격 URL → 임시 파일 저장
   try {
-    const ext =
-      /(\.png)(\?|$)/i.test(url) ? 'png' :
-        /(\.webp)(\?|$)/i.test(url) ? 'webp' : 'jpg';
-    const localPath = `${RNFS.CachesDirectoryPath}/share_${Date.now()}.${ext}`;
-    const res = await RNFS.downloadFile({ fromUrl: url, toFile: localPath }).promise;
-    // res.statusCode === 200 확인 가능
-    return `file://${localPath}`;
-  } catch {
-    // 실패 시 원본 URL 그대로 반환(마지막 폴백)
-    return url;
-  }
+    const ext = guessExt(url);
+    const toFile = `${RNFS.CachesDirectoryPath}/share_${Date.now()}.${ext}`;
+    const r = await RNFS.downloadFile({ fromUrl: url, toFile }).promise;
+    if (r.statusCode >= 200 && r.statusCode < 300) return `file://${toFile}`;
+  } catch { }
+  return url;
 }
+
+
 
 async function handleShareToChannel(payload, sendToWeb) {
   const key = payload?.social;
@@ -95,51 +84,38 @@ async function handleShareToChannel(payload, sendToWeb) {
   const social = SOCIAL_MAP[key] ?? SOCIAL_MAP.SYSTEM;
 
   const text = buildFinalText(data);
-
   let file = data.imageUrl || data.url || data.image;
 
   try {
-    // 인스타/페북류: 캡션 자동 주입 제한 → 클립보드 선복사
     const needClipboard = [Share.Social.INSTAGRAM, Share.Social.INSTAGRAM_STORIES, Share.Social.FACEBOOK].includes(social);
-    if (needClipboard && text) {
-      Clipboard.setString(text);
-      sendToWeb('TOAST', { message: '캡션이 복사되었어요. 업로드 화면에서 붙여넣기 하세요.' });
+    if (needClipboard && text) { Clipboard.setString(text); sendToWeb('TOAST', { message: '캡션이 복사되었어요. 업로드 화면에서 붙여넣기 하세요.' }); }
+
+    file = await ensureLocalFile(file, social);
+    const ext = (file.match(/\.(png|jpg|jpeg|webp|gif)(\?|$)/i)?.[1] || guessExt(file)).toLowerCase();
+    const mime = extToMime(ext);
+
+    if (social === Share.Social.INSTAGRAM_STORIES) {
+      await Share.shareSingle({ social, backgroundImage: file, attributionURL: data.link, failOnCancel: false });
+      sendToWeb('SHARE_RESULT', { success: true, platform: key, post_id: null }); return;
     }
 
-      // 🔴 중요: 해당 채널이 로컬 파일을 요구하면, 원격 URL을 로컬로 저장
-       file = await ensureLocalFileForChannel(file, social);
+    if (typeof social === 'string' && !['SYSTEM', 'KAKAO', 'NAVER'].includes(social)) {
+      await Share.shareSingle({ social, url: file, message: needClipboard ? undefined : text, type: mime, filename: `share.${ext}`, failOnCancel: false });
+      sendToWeb('SHARE_RESULT', { success: true, platform: key, post_id: null }); return;
+    }
 
-    // 지원되는 소셜은 shareSingle 시도
-    if (typeof social === 'string' && social !== 'SYSTEM' && social !== 'KAKAO' && social !== 'NAVER') {
-    await Share.shareSingle({
-        social,
-        url: file,                                // 이제 file:// 경로
-        message: needClipboard ? undefined : text,
-        failOnCancel: false,
-      });
+    await Share.open({ url: file, message: text, title: '공유', type: mime, filename: `share.${ext}`, failOnCancel: false });
     sendToWeb('SHARE_RESULT', { success: true, platform: key, post_id: null });
-    return;
-  }
-
-    // KAKAO/NAVER/SYSTEM: 시스템 공유 시트
-
-  await Share.open({ url: file, message: text, title: '공유', failOnCancel: false });
-  sendToWeb('SHARE_RESULT', { success: true, platform: key, post_id: null });
-} catch (err) {
-  // 폴백 1: 이미지 없이 텍스트만 공유 시트
-  try {
-     await Share.open({ message: text, title: '공유', failOnCancel: false });
-    sendToWeb('SHARE_RESULT', { success: true, platform: key, post_id: null });
-  } catch (e2) {
-    sendToWeb('SHARE_RESULT', {
-      success: false,
-      platform: key,
-      error_code: 'share_failed',
-      message: String(err?.message || err),
-    });
+  } catch (err) {
+    try {
+      await Share.open({ message: text, title: '공유', failOnCancel: false });
+      sendToWeb('SHARE_RESULT', { success: true, platform: key, post_id: null });
+    } catch (e2) {
+      sendToWeb('SHARE_RESULT', { success: false, platform: key, error_code: 'share_failed', message: String(err?.message || err) });
+    }
   }
 }
-}
+
 
 
 const App = () => {
@@ -151,7 +127,7 @@ const App = () => {
 
   const bootTORef = useRef(null);
   const [token, setToken] = useState('');
-
+  const lastPushTokenRef = useRef('');
   const lastNavStateRef = useRef({}); // 웹 라우팅 상태 저장
 
   useEffect(() => { LogBox.ignoreAllLogs(true); }, []);
@@ -264,6 +240,8 @@ const App = () => {
       try {
         const fcmToken = await messaging().getToken();
         setToken(fcmToken);
+        lastPushTokenRef.current = fcmToken; // ref에 최신값 저장
+
         sendToWeb('PUSH_TOKEN', {
           token: fcmToken, platform: Platform.OS, app_version: APP_VERSION,
           install_id: 'unknown', ts: Date.now(),
@@ -442,6 +420,30 @@ const App = () => {
           break;
         }
 
+        case 'GET_PUSH_TOKEN': {
+          // 옵션: 최신 권한 상태도 같이 알려주고 싶으면 ensureNotificationPermission() 호출
+          try {
+            const t = lastPushTokenRef?.current || token || '';
+            sendToWeb('PUSH_TOKEN', {
+              token: t,
+              platform: Platform.OS,
+              app_version: APP_VERSION,
+              install_id: 'unknown', // 필요 시 실제 설치ID 전달
+              ts: Date.now(),
+            });
+          } catch (err) {
+            sendToWeb('PUSH_TOKEN', {
+              token: '',
+              platform: Platform.OS,
+              app_version: APP_VERSION,
+              install_id: 'unknown',
+              ts: Date.now(),
+              error: String(err?.message || err),
+            });
+          }
+          break;
+        }
+          
         // NEW: 채널 지정 공유 (웹 바텀시트 → RN)
         case 'share.toChannel': {
           await handleShareToChannel(data, sendToWeb);
@@ -507,7 +509,7 @@ const App = () => {
         <StatusBar barStyle="dark-content" backgroundColor="#ffffff" />
         <WebView
           ref={webViewRef}
-          source={{ uri: 'https://wizad-b69ee.web.app' }}
+          source={{ uri: 'http://www.wizmarket.ai:53003/ads/login/MA010120220808570604' }}
           onMessage={onMessageFromWeb}
           onLoadStart={onWebViewLoadStart}
           onLoadProgress={({ nativeEvent }) => {
