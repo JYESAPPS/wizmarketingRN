@@ -1,6 +1,6 @@
-// android/app/src/main/java/com/wizmarket/MainApplication.kt
 package com.wizmarket
 
+// ✅ CameraRoll 모듈 import
 import android.app.Application
 import com.facebook.react.PackageList
 import com.facebook.react.ReactApplication
@@ -10,10 +10,9 @@ import com.facebook.react.ReactNativeHost
 import com.facebook.react.ReactPackage
 import com.facebook.react.defaults.DefaultReactHost.getDefaultReactHost
 import com.facebook.react.defaults.DefaultReactNativeHost
-import com.wizmarket.kakao.KakaoLoginPackage
-
 import com.kakao.sdk.common.KakaoSdk
-
+import com.reactnativecommunity.cameraroll.CameraRollPackage
+import com.wizmarket.kakao.KakaoLoginPackage
 
 class MainApplication : Application(), ReactApplication {
 
@@ -21,11 +20,14 @@ class MainApplication : Application(), ReactApplication {
           object : DefaultReactNativeHost(this) {
 
             override fun getPackages(): List<ReactPackage> {
-          val packages = PackageList(this).packages
-          packages.add(KakaoLoginPackage())
-          return packages
-        }
+              val packages = PackageList(this).packages
 
+              // ✅ 수동 추가
+              packages.add(KakaoLoginPackage())
+              packages.add(CameraRollPackage())
+
+              return packages
+            }
 
             override fun getJSMainModuleName(): String = "index"
             override fun getUseDeveloperSupport(): Boolean = BuildConfig.DEBUG
@@ -38,10 +40,8 @@ class MainApplication : Application(), ReactApplication {
 
   override fun onCreate() {
     super.onCreate()
-    KakaoSdk.init(this, BuildConfig.KAKAO_NATIVE_APP_KEY) // 키 주입 방식은 아래 참고
+    KakaoSdk.init(this, BuildConfig.KAKAO_NATIVE_APP_KEY)
 
     loadReactNative(this)
-
-
   }
 }

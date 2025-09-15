@@ -12,6 +12,31 @@ if(NOT "${NEW_GLOB}" STREQUAL "${OLD_GLOB}")
   file(TOUCH_NOCREATE "/Users/sungwon/Downloads/Develop/Mobile/wizmarketingRN/android/app/.cxx/RelWithDebInfo/2t3g44w4/x86_64/CMakeFiles/cmake.verify_globs")
 endif()
 
+# react_codegen_SRCS at /Users/sungwon/Downloads/Develop/Mobile/wizmarketingRN/node_modules/@react-native-camera-roll/camera-roll/android/build/generated/source/codegen/jni/CMakeLists.txt:9 (file)
+file(GLOB NEW_GLOB LIST_DIRECTORIES true "/Users/sungwon/Downloads/Develop/Mobile/wizmarketingRN/node_modules/@react-native-camera-roll/camera-roll/android/build/generated/source/codegen/jni/*.cpp")
+set(OLD_GLOB
+  "/Users/sungwon/Downloads/Develop/Mobile/wizmarketingRN/node_modules/@react-native-camera-roll/camera-roll/android/build/generated/source/codegen/jni/rncameraroll-generated.cpp"
+  )
+if(NOT "${NEW_GLOB}" STREQUAL "${OLD_GLOB}")
+  message("-- GLOB mismatch!")
+  file(TOUCH_NOCREATE "/Users/sungwon/Downloads/Develop/Mobile/wizmarketingRN/android/app/.cxx/RelWithDebInfo/2t3g44w4/x86_64/CMakeFiles/cmake.verify_globs")
+endif()
+
+# react_codegen_SRCS at /Users/sungwon/Downloads/Develop/Mobile/wizmarketingRN/node_modules/@react-native-camera-roll/camera-roll/android/build/generated/source/codegen/jni/CMakeLists.txt:9 (file)
+file(GLOB NEW_GLOB LIST_DIRECTORIES true "/Users/sungwon/Downloads/Develop/Mobile/wizmarketingRN/node_modules/@react-native-camera-roll/camera-roll/android/build/generated/source/codegen/jni/react/renderer/components/rncameraroll/*.cpp")
+set(OLD_GLOB
+  "/Users/sungwon/Downloads/Develop/Mobile/wizmarketingRN/node_modules/@react-native-camera-roll/camera-roll/android/build/generated/source/codegen/jni/react/renderer/components/rncameraroll/ComponentDescriptors.cpp"
+  "/Users/sungwon/Downloads/Develop/Mobile/wizmarketingRN/node_modules/@react-native-camera-roll/camera-roll/android/build/generated/source/codegen/jni/react/renderer/components/rncameraroll/EventEmitters.cpp"
+  "/Users/sungwon/Downloads/Develop/Mobile/wizmarketingRN/node_modules/@react-native-camera-roll/camera-roll/android/build/generated/source/codegen/jni/react/renderer/components/rncameraroll/Props.cpp"
+  "/Users/sungwon/Downloads/Develop/Mobile/wizmarketingRN/node_modules/@react-native-camera-roll/camera-roll/android/build/generated/source/codegen/jni/react/renderer/components/rncameraroll/ShadowNodes.cpp"
+  "/Users/sungwon/Downloads/Develop/Mobile/wizmarketingRN/node_modules/@react-native-camera-roll/camera-roll/android/build/generated/source/codegen/jni/react/renderer/components/rncameraroll/States.cpp"
+  "/Users/sungwon/Downloads/Develop/Mobile/wizmarketingRN/node_modules/@react-native-camera-roll/camera-roll/android/build/generated/source/codegen/jni/react/renderer/components/rncameraroll/rncamerarollJSI-generated.cpp"
+  )
+if(NOT "${NEW_GLOB}" STREQUAL "${OLD_GLOB}")
+  message("-- GLOB mismatch!")
+  file(TOUCH_NOCREATE "/Users/sungwon/Downloads/Develop/Mobile/wizmarketingRN/android/app/.cxx/RelWithDebInfo/2t3g44w4/x86_64/CMakeFiles/cmake.verify_globs")
+endif()
+
 # react_codegen_SRCS at /Users/sungwon/Downloads/Develop/Mobile/wizmarketingRN/node_modules/@react-native-clipboard/clipboard/android/build/generated/source/codegen/jni/CMakeLists.txt:9 (file)
 file(GLOB NEW_GLOB LIST_DIRECTORIES true "/Users/sungwon/Downloads/Develop/Mobile/wizmarketingRN/node_modules/@react-native-clipboard/clipboard/android/build/generated/source/codegen/jni/*.cpp")
 set(OLD_GLOB

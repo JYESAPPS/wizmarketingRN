@@ -1,14 +1,12 @@
-// App.js — WizMarketing WebView Bridge (push + auth: Google live / Apple&Kakao mock + SafeArea fix + Channel Share)
-// deps: react-native-webview, @react-native-firebase/messaging, @notifee/react-native, react-native-share
-// + auth deps: @react-native-google-signin/google-signin, @react-native-firebase/auth
-// + ui deps: react-native-safe-area-context
-// + share deps: rn-fetch-blob, @react-native-clipboard/clipboard
+// App.js — WizMarketing WebView Bridge
+// (push + auth: Google live / Kakao native + SafeArea + Channel Share + Image Download→Gallery)
 
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import '@react-native-firebase/app';
 import {
   BackHandler, StyleSheet, Platform, Alert,
   Linking, LogBox, Animated, Easing, StatusBar,
+  PermissionsAndroid,
 } from 'react-native';
 import { WebView } from 'react-native-webview';
 import messaging from '@react-native-firebase/messaging';
@@ -19,6 +17,7 @@ import Clipboard from '@react-native-clipboard/clipboard';
 import RNFS from 'react-native-fs';
 
 
+import { CameraRoll } from '@react-native-camera-roll/camera-roll';
 
 import auth from '@react-native-firebase/auth';
 import { GoogleSignin } from '@react-native-google-signin/google-signin';
@@ -48,80 +47,68 @@ const SOCIAL_MAP = {
   FACEBOOK: SOCIAL.FACEBOOK,
   TWITTER: SOCIAL.TWITTER,
   SMS: SOCIAL.SMS,
-  // shareSingle 미지원 → 폴백 처리
   KAKAO: 'KAKAO',
   NAVER: 'NAVER',
   SYSTEM: 'SYSTEM',
 };
-
-
-
 
 function buildFinalText({ caption, hashtags = [], couponEnabled = false, link } = {}) {
   const tags = Array.isArray(hashtags) ? hashtags.join(' ') : (hashtags || '');
   return `${caption || ''}${tags ? `\n\n${tags}` : ''}${couponEnabled ? `\n\n✅ 민생회복소비쿠폰` : ''}${link ? `\n${link}` : ''}`.trim();
 }
 
+// RNFS 유틸
+function downloadTo(fromUrl, toFile) {
+  return RNFS.downloadFile({ fromUrl, toFile }).promise;
+}
+function guessExt(u = '') {
+  u = u.toLowerCase();
+  if (u.includes('.png')) return 'png';
+  if (u.includes('.webp')) return 'webp';
+  if (u.includes('.gif')) return 'gif';
+  return 'jpg';
+}
+function extToMime(e) {
+  return e === 'png' ? 'image/png' : e === 'webp' ? 'image/webp' : 'image/jpeg';
+}
 
-
-// 내부→외부 캐시 폴백 + 존재/사이즈 검증 + 상세 로그
-async function ensureLocalFile(url, socialTag = 'KAKAO') {
-  if (!url || /^file:\/\//i.test(url) || /^data:/i.test(url)) return url;
-
-  const ext = guessExt(url);
-  const tryPaths = [];
-
-  // 1차: 내부 캐시
-  tryPaths.push(`${RNFS.CachesDirectoryPath}/share_${Date.now()}.${ext}`);
-  // 2차: 외부 캐시(안드 전용) — 일부 기기 카톡이 내부 캐시 못 읽는 케이스
-  if (Platform.OS === 'android' && RNFS.ExternalCachesDirectoryPath) {
-    tryPaths.push(`${RNFS.ExternalCachesDirectoryPath}/share_${Date.now()}.${ext}`);
-  }
-
-  for (const toFile of tryPaths) {
-    try {
-      const res = await downloadTo(url, toFile);
-      // statusCode 검증
-      if (!(res && res.statusCode >= 200 && res.statusCode < 300)) {
-        console.log('[DL][fail]', socialTag, res?.statusCode, '→', toFile);
-        continue;
-      }
-      // 존재/사이즈 검증
-      try {
-        const st = await RNFS.stat(toFile);
-        if (st.isFile() && Number(st.size) > 0) {
-          const local = `file://${toFile}`;
-          console.log('[DL][ok]', socialTag, '→', local, 'size=', st.size);
-          return local;
-        }
-        console.log('[DL][stat-zero]', socialTag, toFile, st.size);
-      } catch (e) {
-        console.log('[DL][stat-err]', socialTag, toFile, String(e?.message || e));
-      }
-    } catch (e) {
-      console.log('[DL][err]', socialTag, toFile, String(e?.message || e));
+// ─────────── 이미지 저장: 권한 + 다운로드 + 갤러리 저장 ───────────
+async function ensureMediaPermissions() {
+  if (Platform.OS !== 'android') return;
+  if (Platform.Version >= 33) {
+    const res = await PermissionsAndroid.request(
+      PermissionsAndroid.PERMISSIONS.READ_MEDIA_IMAGES
+    );
+    if (res !== PermissionsAndroid.RESULTS.GRANTED) {
+      throw new Error('READ_MEDIA_IMAGES denied');
+    }
+  } else {
+    const res = await PermissionsAndroid.request(
+      PermissionsAndroid.PERMISSIONS.WRITE_EXTERNAL_STORAGE
+    );
+    if (res !== PermissionsAndroid.RESULTS.GRANTED) {
+      throw new Error('WRITE_EXTERNAL_STORAGE denied');
     }
   }
-
-  // 모두 실패 → 원본 URL 반환(이미지 없이 갈 수 있음)
-  return url;
 }
 
+async function downloadAndSaveToGallery(url, filename = 'image.jpg') {
+  if (!url) throw new Error('no_url');
+  await ensureMediaPermissions();
 
-function guessExt(u = '') { u = u.toLowerCase(); if (u.includes('.png')) return 'png'; if (u.includes('.webp')) return 'webp'; if (u.includes('.gif')) return 'gif'; return 'jpg'; }
-function extToMime(e) { return e === 'png' ? 'image/png' : e === 'webp' ? 'image/webp' : 'image/jpeg'; }
+  const ext = (url.match(/\.(png|jpg|jpeg|webp|gif)(\?|$)/i)?.[1] || 'jpg').toLowerCase();
+  const name = filename.endsWith(`.${ext}`) ? filename : `${filename}.${ext}`;
+  const dest = `${RNFS.CachesDirectoryPath}/${Date.now()}_${name}`;
 
-
-
-async function toBase64DataUrl(srcUrl) {
-  const ext = guessExt(srcUrl);
-  const local = `${RNFS.CachesDirectoryPath}/share_${Date.now()}.${ext}`;
-  const r = await RNFS.downloadFile({ fromUrl: srcUrl, toFile: local }).promise;
-  if (!(r.statusCode >= 200 && r.statusCode < 300)) throw new Error(`download ${r.statusCode}`);
-  const bin = await RNFS.readFile(local, 'base64');
-  return { dataUrl: `data:${extToMime(ext)};base64,${bin}`, ext };
+  const { statusCode } = await RNFS.downloadFile({ fromUrl: url, toFile: dest }).promise;
+  if (!(statusCode >= 200 && statusCode < 300)) {
+    throw new Error(`download failed: ${statusCode}`);
+  }
+  await CameraRoll.save(dest, { type: 'photo' });
+  RNFS.unlink(dest).catch(() => { });
 }
 
+// ─────────── 공유 핸들러 (카카오 포함) ───────────
 function safeStr(x) {
   if (typeof x === 'string') return x;
   if (x == null) return '';
@@ -133,9 +120,8 @@ function stripImageUrlsFromText(text) {
   return out.replace(/[ \t]{2,}/g, ' ').trim();
 }
 
-
 async function handleShareToChannel(payload, sendToWeb) {
-  const key = payload?.social;
+  const key = (payload?.social || '').toUpperCase();
   const data = payload?.data || {};
   const social = SOCIAL_MAP[key] ?? SOCIAL_MAP.SYSTEM;
 
@@ -144,31 +130,20 @@ async function handleShareToChannel(payload, sendToWeb) {
 
   try {
     const needClipboard = [Share.Social.INSTAGRAM, Share.Social.INSTAGRAM_STORIES, Share.Social.FACEBOOK].includes(social);
-    if (needClipboard && text) { Clipboard.setString(text); sendToWeb('TOAST', { message: '캡션이 복사되었어요. 업로드 화면에서 붙여넣기 하세요.' }); }
+    if (needClipboard && text) {
+      Clipboard.setString(text);
+      sendToWeb('TOAST', { message: '캡션이 복사되었어요. 업로드 화면에서 붙여넣기 하세요.' });
+    }
 
-    file = await ensureLocalFile(file, social);
-    const ext = (file.match(/\.(png|jpg|jpeg|webp|gif)(\?|$)/i)?.[1] || guessExt(file)).toLowerCase();
+    const ext = guessExt(file);
     const mime = extToMime(ext);
 
-    // ✅ KakaoTalk: 로컬 파일을 보장하고, 본문에서 이미지 URL은 제거
-    // Kakao 분기 (교체)
-
-    console.log('[KAKAO][enter 전]', { ts: Date.now() });
-
-    const key = (payload?.social || '').toUpperCase();
-    console.log('[KAKAO][enter 전]', { ts: Date.now(), key });
-
-    // helpers가 없다면 위쪽에 한번만
-
-    // 🔒 KAKAO 분기 — 어디서 멈추는지 잡는 가드 로그 + 즉시 우회(dataURL) 포함
+    // Kakao: file:// 로 공유
     if (key === 'KAKAO') {
       const src = data.imageUrl || data.url || data.image;
-
-      // 텍스트 준비 (이미지 URL 제거)
       const cleanText = safeStr(text);
       const pasteText = stripImageUrlsFromText(cleanText);
 
-      // 1) 파일 다운로드 (이미 해오던 것 그대로)
       const kExt = guessExt(src);
       const dlPath = `${RNFS.CachesDirectoryPath}/share_${Date.now()}.${kExt}`;
       const r = await RNFS.downloadFile({ fromUrl: src, toFile: dlPath }).promise;
@@ -181,17 +156,12 @@ async function handleShareToChannel(payload, sendToWeb) {
       const fileUrl = `file://${dlPath}`;
       const kMime = extToMime(kExt);
 
-      // 디버그 로그
-      console.log('[KAKAO][share:file]', { fileUrl, kMime, size: st.size, msgLen: pasteText.length });
-
-      // 2) 카카오톡 공유 (파일 경로 + 텍스트)
-      //    ⚠️ dataUrl은 사용하지 않음 (일부 기기에서 NPE)
       await Share.open({
         title: '카카오톡으로 공유',
-        url: fileUrl,               // ← file:// 경로 직접 전달
-        type: kMime,                // image/jpeg 등
+        url: fileUrl,
+        type: kMime,
         filename: `share.${kExt}`,
-        message: pasteText,         // 텍스트 함께 전달 (형 기기에서 OK)
+        message: pasteText,
         failOnCancel: false,
       });
 
@@ -199,36 +169,43 @@ async function handleShareToChannel(payload, sendToWeb) {
       return;
     }
 
-
-
-
-
     if (social === Share.Social.INSTAGRAM_STORIES) {
-      await Share.shareSingle({ social, backgroundImage: file, attributionURL: data.link, failOnCancel: false });
-      sendToWeb('SHARE_RESULT', { success: true, platform: key, post_id: null }); return;
+      await Share.shareSingle({
+        social,
+        backgroundImage: file,
+        attributionURL: data.link,
+        failOnCancel: false,
+      });
+      sendToWeb('SHARE_RESULT', { success: true, platform: key, post_id: null });
+      return;
     }
 
     if (typeof social === 'string' && !['SYSTEM', 'KAKAO', 'NAVER'].includes(social)) {
-      await Share.shareSingle({ social, url: file, message: needClipboard ? undefined : text, type: mime, filename: `share.${ext}`, failOnCancel: false });
-      sendToWeb('SHARE_RESULT', { success: true, platform: key, post_id: null }); return;
+      await Share.shareSingle({
+        social,
+        url: file,
+        message: needClipboard ? undefined : text,
+        type: mime,
+        filename: `share.${ext}`,
+        failOnCancel: false,
+      });
+      sendToWeb('SHARE_RESULT', { success: true, platform: key, post_id: null });
+      return;
     }
 
     await Share.open({ url: file, message: text, title: '공유', type: mime, filename: `share.${ext}`, failOnCancel: false });
     sendToWeb('SHARE_RESULT', { success: true, platform: key, post_id: null });
   } catch (err) {
-    try {
-      await Share.open({ message: text, title: '공유', failOnCancel: false });
-      sendToWeb('SHARE_RESULT', { success: true, platform: key, post_id: null });
-    } catch (e2) {
-      sendToWeb('SHARE_RESULT', { success: false, platform: key, error_code: 'share_failed', message: String(err?.message || err) });
-    }
+    sendToWeb('SHARE_RESULT', { success: false, platform: key, error_code: 'share_failed', message: String(err?.message || err) });
   }
 }
 
-
-
+// ─────────── App 컴포넌트 ───────────
 const App = () => {
   const webViewRef = useRef(null);
+
+
+
 
   const [splashVisible, setSplashVisible] = useState(true);
   const splashStartRef = useRef(0);
@@ -237,20 +214,18 @@ const App = () => {
   const bootTORef = useRef(null);
   const [token, setToken] = useState('');
   const lastPushTokenRef = useRef('');
-  const lastNavStateRef = useRef({}); // 웹 라우팅 상태 저장
+  const lastNavStateRef = useRef({});
 
   useEffect(() => { LogBox.ignoreAllLogs(true); }, []);
 
-  // ─────────── Web으로 메시지 보내기 ───────────
   const sendToWeb = useCallback((type, payload = {}) => {
     try {
       const msg = JSON.stringify({ type, payload });
       webViewRef.current?.postMessage(msg);
-      if (__DEV__) console.log('📡 to Web:', msg);
     } catch (e) { console.log('❌ postMessage error:', e); }
   }, []);
 
-  // ─────────── Splash helpers (정의 순서 주의) ───────────
+  // Splash
   const hideSplashRespectingMin = useCallback(() => {
     const elapsed = Date.now() - (splashStartRef.current || Date.now());
     const wait = Math.max(MIN_SPLASH_MS - elapsed, 0);
@@ -271,18 +246,15 @@ const App = () => {
     }
   }, [splashFade, splashVisible]);
 
-  // ─────────── HW Back 처리 ───────────
+  // HW Back
   useEffect(() => {
     const sub = BackHandler.addEventListener('hardwareBackPress', () => {
       const nav = lastNavStateRef.current || {};
-      console.log('[HW BACK] event fired, nav=', nav);
-
       const isRoot = nav.isRoot === true;
       const webCanHandle =
         !isRoot || nav.hasBlockingUI === true || nav.needsConfirm === true || nav.canGoBackInWeb === true;
 
       if (webCanHandle) {
-        console.log('[HW BACK] sending BACK_REQUEST');
         sendToWeb('BACK_REQUEST', { nav, at: Date.now() });
         return true;
       }
@@ -296,7 +268,7 @@ const App = () => {
     return () => sub.remove();
   }, [sendToWeb]);
 
-  // ─────────── WEB 상태 ACK ───────────
+  // Web ready/error
   const handleWebReady = useCallback(() => {
     if (bootTORef.current) { clearTimeout(bootTORef.current); bootTORef.current = null; }
     sendToWeb('WEB_READY_ACK', { at: Date.now() });
@@ -309,7 +281,7 @@ const App = () => {
     sendToWeb('OFFLINE_FALLBACK', { reason: payload?.reason || 'js_error', at: Date.now() });
   }, [sendToWeb]);
 
-  // ─────────── 권한: 알림만 ───────────
+  // Push permission (notifee)
   const ensureNotificationPermission = useCallback(async () => {
     try {
       const settings = await notifee.requestPermission();
@@ -324,32 +296,13 @@ const App = () => {
     });
   }, [sendToWeb, token]);
 
-  const handleStartSubscription = useCallback(async (payload) => {
-    sendToWeb('SUBSCRIPTION_RESULT', {
-      success: true,
-      product_id: payload?.product_id,
-      transaction_id: 'tx_demo_001',
-      expires_at:
-        payload?.product_type === 'subscription'
-          ? Date.now() + 30 * 24 * 3600_000
-          : undefined,
-    });
-  }, [sendToWeb]);
-
-  useEffect(() => {
-    (async () => {
-      const push = await ensureNotificationPermission();
-      replyPermissionStatus({ pushGranted: push });
-    })();
-  }, [ensureNotificationPermission, replyPermissionStatus]);
-
-  // ─────────── FCM ───────────
+  // Push: token + foreground
   useEffect(() => {
     (async () => {
       try {
         const fcmToken = await messaging().getToken();
         setToken(fcmToken);
-        lastPushTokenRef.current = fcmToken; // ref에 최신값 저장
+        lastPushTokenRef.current = fcmToken;
 
         sendToWeb('PUSH_TOKEN', {
           token: fcmToken, platform: Platform.OS, app_version: APP_VERSION,
@@ -371,31 +324,22 @@ const App = () => {
     return () => unsubscribe();
   }, [sendToWeb]);
 
-  // 안전하게 sendToWeb 감싸는 함수
+  // Auth: Google/Kakao
   const safeSend = (type, payload) => {
-    try {
-      sendToWeb(type, payload);
-    } catch (e) {
-      console.log('[SEND_ERROR]', e);
-    }
+    try { sendToWeb(type, payload); } catch (e) { console.log('[SEND_ERROR]', e); }
   };
 
-  // ─────────── Auth: Sign-in/out ───────────
   const handleStartSignin = useCallback(async (payload) => {
     const provider = payload?.provider;
     try {
-      /** ────────────── Google 로그인 ────────────── */
       if (provider === 'google') {
         await GoogleSignin.hasPlayServices({ showPlayServicesUpdateDialog: true });
         try { await GoogleSignin.signOut(); } catch { }
         try { await GoogleSignin.revokeAccess(); } catch { }
-        const res = await GoogleSignin.signIn(); // { idToken, user, ... }
+        const res = await GoogleSignin.signIn();
         let idToken = res?.idToken;
         if (!idToken) {
-          try {
-            const tokens = await GoogleSignin.getTokens(); // { idToken, accessToken }
-            idToken = tokens?.idToken || null;
-          } catch { }
+          try { const tokens = await GoogleSignin.getTokens(); idToken = tokens?.idToken || null; } catch { }
         }
         if (!idToken) throw new Error('no_id_token');
         const googleCredential = auth.GoogleAuthProvider.credential(idToken);
@@ -414,7 +358,6 @@ const App = () => {
         return;
       }
 
-      /** ────────────── Kakao 로그인 ────────────── */
       if (provider === 'kakao') {
         try {
           const keyHash = await KakaoLoginModule.getKeyHash();
@@ -450,19 +393,13 @@ const App = () => {
 
       throw new Error('unsupported_provider');
     } catch (err) {
-      console.log('[LOGIN ERROR raw]', err, 'type=', typeof err);
       const code =
         (err && typeof err === 'object' && 'code' in err) ? err.code :
           (String(err?.message || '').includes('no_id_token') ? 'no_id_token' : 'unknown_error');
       const msg =
         (err && typeof err === 'object' && 'message' in err && err.message) ||
         (typeof err === 'string' ? err : JSON.stringify(err));
-      safeSend('SIGNIN_RESULT', {
-        success: false,
-        provider,
-        error_code: code,
-        error_message: msg,
-      });
+      safeSend('SIGNIN_RESULT', { success: false, provider, error_code: code, error_message: msg });
     }
   }, [sendToWeb]);
 
@@ -471,15 +408,11 @@ const App = () => {
       await auth().signOut();
       sendToWeb('SIGNOUT_RESULT', { success: true });
     } catch (err) {
-      sendToWeb('SIGNOUT_RESULT', {
-        success: false,
-        error_code: 'signout_error',
-        message: String(err?.message || err),
-      });
+      sendToWeb('SIGNOUT_RESULT', { success: false, error_code: 'signout_error', message: String(err?.message || err) });
     }
   }, [sendToWeb]);
 
-  // ─────────── Web → App 라우터 ───────────
+  // Web → App 라우터
   const handleCheckPermission = useCallback(async () => {
     const push = await ensureNotificationPermission();
     replyPermissionStatus({ pushGranted: push });
@@ -506,9 +439,16 @@ const App = () => {
         case 'CHECK_PERMISSION': await handleCheckPermission(); break;
         case 'REQUEST_PERMISSION': await handleRequestPermission(); break;
 
-        case 'START_SUBSCRIPTION': await handleStartSubscription(data.payload); break;
+        case 'START_SUBSCRIPTION': {
+          sendToWeb('SUBSCRIPTION_RESULT', {
+            success: true,
+            product_id: data?.payload?.product_id,
+            transaction_id: 'tx_demo_001',
+            expires_at: data?.payload?.product_type === 'subscription' ? Date.now() + 30 * 24 * 3600_000 : undefined,
+          });
+          break;
+        }
 
-        // 기존 시스템 공유 시트
         case 'START_SHARE': {
           try {
             const { image, caption, platform } = data.payload || {};
@@ -516,28 +456,51 @@ const App = () => {
               title: '공유',
               message: caption ? `${caption}\n` : undefined,
               url: image,
+              failOnCancel: false,
             });
             sendToWeb('SHARE_RESULT', { success: true, platform, post_id: null });
           } catch (err) {
-            sendToWeb('SHARE_RESULT', {
+            sendToWeb('SHARE_RESULT', { success: false, platform: data?.payload?.platform, error_code: 'share_failed', message: String(err?.message || err) });
+          }
+          break;
+        }
+
+        case 'share.toChannel': {
+          await handleShareToChannel(data, sendToWeb);
+          break;
+        }
+
+        case 'DOWNLOAD_IMAGE': {
+          try {
+            const { url, filename } = data.payload || {};
+            if (!url) throw new Error('no_url');
+
+            // 확장자 기본값 강제
+            const safeName = filename && filename.includes('.') ? filename : 'image.jpg';
+
+            await downloadAndSaveToGallery(url, safeName);
+            sendToWeb('DOWNLOAD_RESULT', { success: true, filename: safeName });
+            Alert.alert('완료', '이미지가 갤러리에 저장되었습니다.');
+          } catch (err) {
+            console.log('[DOWNLOAD_IMAGE][error]', err); // 🔍 에러 로그 확인
+            sendToWeb('DOWNLOAD_RESULT', {
               success: false,
-              platform: data?.payload?.platform,
-              error_code: 'share_failed',
+              error_code: 'save_failed',
               message: String(err?.message || err),
             });
+            Alert.alert('오류', `이미지 저장 실패: ${String(err?.message || err)}`);
           }
           break;
         }
 
         case 'GET_PUSH_TOKEN': {
-          // 옵션: 최신 권한 상태도 같이 알려주고 싶으면 ensureNotificationPermission() 호출
           try {
-            const t = lastPushTokenRef?.current || token || '';
+            const t = lastPushTokenRef.current || token || '';
             sendToWeb('PUSH_TOKEN', {
               token: t,
               platform: Platform.OS,
               app_version: APP_VERSION,
-              install_id: 'unknown', // 필요 시 실제 설치ID 전달
+              install_id: 'unknown',
               ts: Date.now(),
             });
           } catch (err) {
@@ -550,12 +513,6 @@ const App = () => {
               error: String(err?.message || err),
             });
           }
-          break;
-        }
-          
-        // NEW: 채널 지정 공유 (웹 바텀시트 → RN)
-        case 'share.toChannel': {
-          await handleShareToChannel(data, sendToWeb);
           break;
         }
 
@@ -579,8 +536,6 @@ const App = () => {
 
         case 'BACK_PRESSED': {
           const nav = lastNavStateRef.current || {};
-          console.log(TAG, 'BACK_PRESSED with nav=', nav);
-
           if (nav.isRoot === true) {
             Alert.alert(
               '앱 종료',
@@ -597,17 +552,18 @@ const App = () => {
           break;
         }
 
-        default: console.warn('⚠️ unknown msg:', data.type);
+        default: console.log('⚠️ unknown msg:', data.type);
       }
-    } catch (err) { console.error('❌ onMessage error:', err); }
-  }, [handleCheckPermission, handleRequestPermission, handleStartSignin, handleStartSignout, handleWebError, handleWebReady, sendToWeb]);
+    } catch (err) {
+      console.error('❌ onMessage error:', err);
+    }
+  }, [handleCheckPermission, handleRequestPermission, handleStartSignin, handleStartSignout, handleWebError, handleWebReady, sendToWeb, token]);
 
-  // ─────────── WebView 로딩 이벤트 ───────────
+  // WebView load
   const onWebViewLoadStart = useCallback(() => {
     showSplashOnce();
     if (bootTORef.current) clearTimeout(bootTORef.current);
     bootTORef.current = setTimeout(() => {
-      bootTORef.current = null;
       sendToWeb('OFFLINE_FALLBACK', { reason: 'timeout', at: Date.now() });
     }, BOOT_TIMEOUT_MS);
   }, [showSplashOnce, sendToWeb]);

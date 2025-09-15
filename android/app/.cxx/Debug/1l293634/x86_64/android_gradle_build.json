@@ -1,5 +1,6 @@
 {
   "buildFiles": [
+    "/Users/sungwon/Downloads/Develop/Mobile/wizmarketingRN/node_modules/@react-native-camera-roll/camera-roll/android/build/generated/source/codegen/jni/CMakeLists.txt",
     "/Users/sungwon/Downloads/Develop/Mobile/wizmarketingRN/node_modules/@react-native-clipboard/clipboard/android/build/generated/source/codegen/jni/CMakeLists.txt",
     "/Users/sungwon/Downloads/Develop/Mobile/wizmarketingRN/node_modules/@react-native-community/geolocation/android/build/generated/source/codegen/jni/CMakeLists.txt",
     "/Users/sungwon/Downloads/Develop/Mobile/wizmarketingRN/node_modules/@react-native-google-signin/google-signin/android/build/generated/source/codegen/jni/CMakeLists.txt",
@@ -54,6 +55,11 @@
       "toolchain": "toolchain",
       "abi": "x86_64",
       "artifactName": "react_codegen_RNShareSpec"
+    },
+    "react_codegen_rncameraroll::@60139d220751b3dabc04": {
+      "toolchain": "toolchain",
+      "abi": "x86_64",
+      "artifactName": "react_codegen_rncameraroll"
     },
     "react_codegen_rnclipboard::@6385240493dfcaf22ab7": {
       "toolchain": "toolchain",

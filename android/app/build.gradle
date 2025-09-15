@@ -67,6 +67,7 @@ dependencies {
   }
   implementation(platform("com.google.firebase:firebase-bom:33.3.0"))
   implementation "com.kakao.sdk:v2-user:2.20.6"   // 최신 가능
+
 }
 
 apply plugin: "com.google.gms.google-services" // 맨 아래 OK

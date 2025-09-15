@@ -1,6 +1,9 @@
 /Users/sungwon/Downloads/Develop/Mobile/wizmarketingRN/android/app/.cxx/Debug/1l293634/armeabi-v7a/CMakeFiles/appmodules.dir
 /Users/sungwon/Downloads/Develop/Mobile/wizmarketingRN/android/app/.cxx/Debug/1l293634/armeabi-v7a/CMakeFiles/edit_cache.dir
 /Users/sungwon/Downloads/Develop/Mobile/wizmarketingRN/android/app/.cxx/Debug/1l293634/armeabi-v7a/CMakeFiles/rebuild_cache.dir
+/Users/sungwon/Downloads/Develop/Mobile/wizmarketingRN/android/app/.cxx/Debug/1l293634/armeabi-v7a/rncameraroll_autolinked_build/CMakeFiles/react_codegen_rncameraroll.dir
+/Users/sungwon/Downloads/Develop/Mobile/wizmarketingRN/android/app/.cxx/Debug/1l293634/armeabi-v7a/rncameraroll_autolinked_build/CMakeFiles/edit_cache.dir
+/Users/sungwon/Downloads/Develop/Mobile/wizmarketingRN/android/app/.cxx/Debug/1l293634/armeabi-v7a/rncameraroll_autolinked_build/CMakeFiles/rebuild_cache.dir
 /Users/sungwon/Downloads/Develop/Mobile/wizmarketingRN/android/app/.cxx/Debug/1l293634/armeabi-v7a/rnclipboard_autolinked_build/CMakeFiles/react_codegen_rnclipboard.dir
 /Users/sungwon/Downloads/Develop/Mobile/wizmarketingRN/android/app/.cxx/Debug/1l293634/armeabi-v7a/rnclipboard_autolinked_build/CMakeFiles/edit_cache.dir
 /Users/sungwon/Downloads/Develop/Mobile/wizmarketingRN/android/app/.cxx/Debug/1l293634/armeabi-v7a/rnclipboard_autolinked_build/CMakeFiles/rebuild_cache.dir
