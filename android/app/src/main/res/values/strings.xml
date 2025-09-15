@@ -1,3 +1,4 @@
 <resources>
     <string name="app_name">Wiz Market</string>
+    <string name="kakao_native_app_key">8343bf6b962ad0d26c5f7636ee2e0861</string>
 </resources>

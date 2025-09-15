@@ -40,6 +40,8 @@ class MainApplication : Application(), ReactApplication {
 
   override fun onCreate() {
     super.onCreate()
+    android.util.Log.i("KAKAO", "AppKey=" + BuildConfig.KAKAO_NATIVE_APP_KEY)
+
     KakaoSdk.init(this, BuildConfig.KAKAO_NATIVE_APP_KEY)
 
     loadReactNative(this)

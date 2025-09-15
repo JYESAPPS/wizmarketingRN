@@ -25,6 +25,7 @@ import { GoogleSignin } from '@react-native-google-signin/google-signin';
 import { SafeAreaProvider, SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import SplashScreenRN from './SplashScreenRN';
 import ImageResizer from 'react-native-image-resizer';
+
 import { NativeModules } from 'react-native';
 const { KakaoLoginModule } = NativeModules;
 
@@ -205,6 +206,7 @@ async function ensureLocalFile(src, preferExt = 'jpg') {
 
 
 
+
 async function handleShareToChannel(payload, sendToWeb) {
   const key = (payload?.social || '').toUpperCase();
   const data = payload?.data || {};
@@ -309,76 +311,49 @@ async function handleShareToChannel(payload, sendToWeb) {
     }
 
     // --- Instagram 피드: 로컬 JPG 고정(이미 테스트 완료 흐름) ---
-    // --- Instagram 피드: 카카오 방식(file://) 적용 + 간단 폴백 ---
+    // --- Instagram 피드 ---
     if (social === Share.Social.INSTAGRAM) {
-      const src = data.imageUrl || data.url || data.image;
-
-      // 0) (안드 전용) 인스타 설치 확인
+      // 설치 확인(안드)
       if (Platform.OS === 'android') {
         try {
           const { isInstalled } = await Share.isPackageInstalled('com.instagram.android');
           if (!isInstalled) {
             sendToWeb('TOAST', { message: '인스타그램이 설치되어 있지 않아요.' });
-            // 시스템 공유 폴백
-            const dl = `${RNFS.CachesDirectoryPath}/ig_${Date.now()}.jpg`;
-            const r0 = await RNFS.downloadFile({ fromUrl: src, toFile: dl, headers: { Accept: 'image/jpeg,image/*;q=0.8' } }).promise;
-            if (r0?.statusCode >= 200 && r0?.statusCode < 300) {
-              await Share.open({ url: `file://${dl}`, type: 'image/jpeg', filename: 'share.jpg', failOnCancel: false });
-            }
+            const { uri, cleanup } = await ensureLocalFile(file, 'jpg');
+            try {
+              await Share.open({ url: uri, type: 'image/jpeg', filename: 'share.jpg', failOnCancel: false });
+            } finally { await cleanup(); }
             sendToWeb('SHARE_RESULT', { success: true, platform: key, post_id: null });
             return;
           }
         } catch { }
       }
 
-      // 1) 파일 다운로드(무조건 JPEG로 저장) + 존재/사이즈 확인
-      const dlPath = `${RNFS.CachesDirectoryPath}/ig_${Date.now()}.jpg`;
-      const r = await RNFS.downloadFile({
-        fromUrl: src,
-        toFile: dlPath,
-        headers: { Accept: 'image/jpeg,image/*;q=0.8' }, // JPEG 우선 힌트
-      }).promise;
-      if (!(r && r.statusCode >= 200 && r.statusCode < 300)) throw new Error(`ig-download-fail-${r?.statusCode || 'unknown'}`);
-
-      const st = await RNFS.stat(dlPath);
-      if (!st.isFile() || Number(st.size) <= 0) throw new Error('ig-downloaded-file-empty');
-
-      const fileUrl = `file://${dlPath}`;
-      const mime = 'image/jpeg';
-
+      const { uri, cleanup } = await ensureLocalFile(file, 'jpg'); // ← 이제 진짜 JPEG
       try {
-        // 2) 1차: shareSingle (인스타 피드 전용)
-        await Share.shareSingle({
-          social: Share.Social.INSTAGRAM,
-          url: fileUrl,                        // ✅ file:// 경로
-          type: mime,
-          filename: 'share.jpg',
-          failOnCancel: false,
-        });
-      } catch (e1) {
         try {
-          // 3) 2차: urls 배열 방식(일부 기기에서 더 잘 먹음)
-          await Share.open({
-            urls: [fileUrl],
-            type: mime,
+          await Share.shareSingle({
+            social: Share.Social.INSTAGRAM,
+            url: uri,
+            type: 'image/jpeg',
             filename: 'share.jpg',
             failOnCancel: false,
           });
-        } catch (e2) {
-          // 4) 최종 폴백: 시스템 공유(사용자가 인스타 선택 가능)
+        } catch (e1) {
+          // urls 배열 방식 한 번 더
           await Share.open({
-            url: fileUrl,
-            type: mime,
+            urls: [uri],
+            type: 'image/jpeg',
             filename: 'share.jpg',
             failOnCancel: false,
           });
         }
+      } finally {
+        await cleanup();
       }
-
       sendToWeb('SHARE_RESULT', { success: true, platform: key, post_id: null });
       return;
     }
-
 
 
     // --- 그 외 채널 ---
@@ -893,7 +868,7 @@ const App = () => {
         <StatusBar barStyle="dark-content" backgroundColor="#ffffff" />
         <WebView
           ref={webViewRef}
-          source={{ uri: 'http://www.wizmarket.ai:53003/ads/login/MA010120220808570604' }}
+          source={{ uri: 'https://wizad-b69ee.web.app/' }}
           onMessage={onMessageFromWeb}
           onLoadStart={onWebViewLoadStart}
           onLoadProgress={({ nativeEvent }) => {

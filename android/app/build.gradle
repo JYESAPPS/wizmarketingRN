@@ -22,7 +22,9 @@ android {
     targetSdkVersion rootProject.ext.targetSdkVersion
     versionCode 1
     versionName "1.0"
-    buildConfigField "String", "KAKAO_NATIVE_APP_KEY", "\"${project.findProperty('KAKAO_NATIVE_APP_KEY') ?: ""}\""
+
+    buildConfigField "String", "KAKAO_NATIVE_APP_KEY", "\"8343bf6b962ad0d26c5f7636ee2e0861\""
+
 
   }
 

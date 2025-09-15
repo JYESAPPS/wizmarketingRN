@@ -1,6 +1,9 @@
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">   <!-- ✅ 추가 -->
+
     <queries>
       <package android:name="com.kakao.talk" />
+      <package android:name="com.instagram.android" />
     </queries>
 
     <uses-permission android:name="android.permission.INTERNET" />
@@ -8,18 +11,20 @@
     <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />
     <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" android:maxSdkVersion="29" />
 
-
-  
-
     <application
       android:name=".MainApplication"
       android:networkSecurityConfig="@xml/network_security_config"
       android:label="@string/app_name"
       android:icon="@mipmap/ic_launcher"
       android:allowBackup="false"
-      android:theme="@style/AppTheme"   
+      android:theme="@style/AppTheme"
       android:supportsRtl="true">
 
+      <!-- ✅ Kakao SDK AppKey (머지 충돌 시 우리 값으로 강제) -->
+      <meta-data
+          android:name="com.kakao.sdk.AppKey"
+          android:value="@string/kakao_native_app_key"
+          tools:replace="android:value" />
 
       <!-- 커스텀(유지) -->
       <provider
@@ -43,7 +48,6 @@
             android:resource="@xml/react_native_share_file_paths"/>
       </provider>
 
-
       <activity
         android:name=".MainActivity"
         android:label="@string/app_name"
@@ -53,22 +57,22 @@
         android:screenOrientation ="portrait"
         android:theme="@style/SplashTheme"
         android:exported="true">
- 
 
-        <!-- A. 런처(앱 실행) 용 -->
+        <!-- A. 런처(앱 실행) -->
         <intent-filter>
           <action android:name="android.intent.action.MAIN" />
           <category android:name="android.intent.category.LAUNCHER" />
         </intent-filter>
 
-        <!-- B. 카카오 로그인 리다이렉트 용 -->
+        <!-- B. 카카오 로그인 리다이렉트 -->
         <intent-filter>
           <action android:name="android.intent.action.VIEW"/>
           <category android:name="android.intent.category.DEFAULT"/>
           <category android:name="android.intent.category.BROWSABLE"/>
+          <!-- ✅ 하드코딩 대신 리소스 참조로 통일 -->
           <data
-          android:scheme="kakao8343bf6b962ad0d26c5f7636ee2e0861"
-          android:host="oauth"/>
+            android:scheme="kakao@string/kakao_native_app_key"
+            android:host="oauth"/>
         </intent-filter>
 
       </activity>
