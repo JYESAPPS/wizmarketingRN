@@ -23,7 +23,29 @@ android {
     versionCode 1
     versionName "1.0"
 
-    buildConfigField "String", "KAKAO_NATIVE_APP_KEY", "\"8343bf6b962ad0d26c5f7636ee2e0861\""
+     // 1) placeholder (scheme 용)
+    manifestPlaceholders = [ KAKAO_NATIVE_APP_KEY: "ef66c5836528d39100550fd6ca87f7dc" ]
+
+    // 2) @string 주입도 같은 값으로 강제
+    resValue "string", "kakao_native_app_key", "ef66c5836528d39100550fd6ca87f7dc"
+
+    // 3) BuildConfig에도 동일값(선택)
+    buildConfigField "String", "KAKAO_NATIVE_APP_KEY", "\"ef66c5836528d39100550fd6ca87f7dc\""
+    
+    buildTypes {
+    debug {
+      // 혹시 다른 곳에서 덮을 가능성 차단
+      manifestPlaceholders.KAKAO_NATIVE_APP_KEY = "ef66c5836528d39100550fd6ca87f7dc"
+      resValue "string", "kakao_native_app_key", "ef66c5836528d39100550fd6ca87f7dc"
+      buildConfigField "String","KAKAO_NATIVE_APP_KEY","\"ef66c5836528d39100550fd6ca87f7dc\""
+    }
+    release {
+      manifestPlaceholders.KAKAO_NATIVE_APP_KEY = "ef66c5836528d39100550fd6ca87f7dc"
+      resValue "string", "kakao_native_app_key", "ef66c5836528d39100550fd6ca87f7dc"
+      buildConfigField "String","KAKAO_NATIVE_APP_KEY","\"ef66c5836528d39100550fd6ca87f7dc\""
+    }
+    } 
+
 
 
   }

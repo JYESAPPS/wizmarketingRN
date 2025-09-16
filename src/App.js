@@ -251,6 +251,117 @@ async function handleShareToChannel(payload, sendToWeb) {
       sendToWeb('SHARE_RESULT', { success: true, platform: key, post_id: null });
       return;
     }
+    // --- BAND: 카카오와 동일하게 file:// + message ---
+    if (key === 'BAND') {
+      const src = data.imageUrl || data.url || data.image;
+      const cleanText = safeStr(text);
+      const body = stripImageUrlsFromText(cleanText);
+
+      const ext = 'jpg';
+      const dlPath = `${RNFS.CachesDirectoryPath}/band_${Date.now()}.${ext}`;
+      const r = await RNFS.downloadFile({ fromUrl: src, toFile: dlPath }).promise;
+      if (!(r && r.statusCode >= 200 && r.statusCode < 300)) throw new Error(`band_download ${r?.statusCode || 'fail'}`);
+      const st = await RNFS.stat(dlPath);
+      if (!st.isFile() || Number(st.size) <= 0) throw new Error('band_downloaded_empty');
+
+      const fileUrl = `file://${dlPath}`;
+      const mime = 'image/jpeg';
+
+      try {
+        // (안드) 밴드 설치 확인 → 미설치면 시스템 공유
+        if (Platform.OS === 'android') {
+          try {
+            const { isInstalled } = await Share.isPackageInstalled('com.nhn.android.band');
+            if (!isInstalled) throw new Error('band_not_installed');
+          } catch {
+            await Share.open({ url: fileUrl, type: mime, filename: 'share.jpg', message: body, failOnCancel: false });
+            sendToWeb('SHARE_RESULT', { success: true, platform: key, post_id: null });
+            return;
+          }
+        }
+
+        await Share.open({
+          url: fileUrl,
+          type: mime,
+          filename: 'share.jpg',
+          message: body,
+          failOnCancel: false,
+        });
+      } finally {
+        try { await RNFS.unlink(dlPath); } catch { }
+      }
+
+      sendToWeb('SHARE_RESULT', { success: true, platform: key, post_id: null });
+      return;
+    }
+
+    // --- X(트위터): file:// + message (shareSingle → urls → open 폴백) ---
+    if (key === 'X' || social === Share.Social.TWITTER) {
+      const src = data.imageUrl || data.url || data.image;
+      const cleanText = safeStr(text);
+      const body = stripImageUrlsFromText(cleanText); // 이미지 URL 제거(링크 공유 방지)
+
+      const ext = 'jpg';
+      const dlPath = `${RNFS.CachesDirectoryPath}/x_${Date.now()}.${ext}`;
+      const r = await RNFS.downloadFile({ fromUrl: src, toFile: dlPath }).promise;
+      if (!(r && r.statusCode >= 200 && r.statusCode < 300)) throw new Error(`x_download ${r?.statusCode || 'fail'}`);
+      const st = await RNFS.stat(dlPath);
+      if (!st.isFile() || Number(st.size) <= 0) throw new Error('x_downloaded_empty');
+
+      const fileUrl = `file://${dlPath}`;
+      const mime = 'image/jpeg';
+
+      try {
+        // (안드) 트위터 설치 확인 → 미설치면 시스템 공유
+        if (Platform.OS === 'android') {
+          try {
+            const { isInstalled } = await Share.isPackageInstalled('com.twitter.android');
+            if (!isInstalled) throw new Error('x_not_installed');
+          } catch {
+            await Share.open({ url: fileUrl, type: mime, filename: 'share.jpg', message: body, failOnCancel: false });
+            sendToWeb('SHARE_RESULT', { success: true, platform: key, post_id: null });
+            return;
+          }
+        }
+
+        // 1차: 트위터 전용 shareSingle
+        try {
+          await Share.shareSingle({
+            social: Share.Social.TWITTER,
+            url: fileUrl,
+            type: mime,
+            filename: 'share.jpg',
+            message: body,              // 280자 제한은 트위터가 내부에서 처리(잘림)
+            failOnCancel: false,
+          });
+        } catch {
+          // 2차: urls 배열 방식
+          try {
+            await Share.open({
+              urls: [fileUrl],
+              type: mime,
+              filename: 'share.jpg',
+              message: body,
+              failOnCancel: false,
+            });
+          } catch {
+            // 3차: 시스템 공유
+            await Share.open({
+              url: fileUrl,
+              type: mime,
+              filename: 'share.jpg',
+              message: body,
+              failOnCancel: false,
+            });
+          }
+        }
+      } finally {
+        try { await RNFS.unlink(dlPath); } catch { }
+      }
+
+      sendToWeb('SHARE_RESULT', { success: true, platform: key, post_id: null });
+      return;
+    }
 
     // --- Instagram Stories: 로컬 PNG + background → sticker 폴백 ---
     if (social === Share.Social.INSTAGRAM_STORIES) {
@@ -661,27 +772,17 @@ const App = () => {
           const keyHash = await KakaoLoginModule.getKeyHash();
           console.log('[KAKAO] keyHash =', keyHash);
 
-          // ── 카카오 환경 점검 로그 ──
-          const appKeyFromBuild =
-            // Gradle buildConfigField 로 브릿지된 경우 (없으면 N/A로 표시)
-            NativeModules?.BuildConfig?.KAKAO_NATIVE_APP_KEY
-            || NativeModules?.BuildConfig?.KAKAO_APP_KEY
-            || 'N/A';
+        
+          // 3) SSO 로그인 (모듈 구현에 따라 분기)
+          let res;
+          if (typeof KakaoLoginModule.loginWithKakaoTalk === 'function') {
+            res = await KakaoLoginModule.loginWithKakaoTalk();
+          } else if (typeof KakaoLoginModule.login === 'function') {
+            res = await KakaoLoginModule.login(); // 형이 쓰던 메서드
+          } else {
+            throw new Error('kakao_module_missing_methods');
+          }
 
-          const pkgName =
-            Platform.OS === 'android'
-              // Android: BuildConfig.APPLICATION_ID 가 브릿지돼 있으면 사용
-              ? (NativeModules?.BuildConfig?.APPLICATION_ID || 'unknown.android')
-              // iOS: PlatformConstants.BundleIdentifier
-              : (NativeModules?.PlatformConstants?.BundleIdentifier || 'unknown.ios');
-
-          console.log('[KAKAO][appKey]', appKeyFromBuild);
-          console.log('[KAKAO][packageName]', pkgName);
-
-     
-
-
-          const res = await KakaoLoginModule.login(); // {accessToken, refreshToken, id, email, nickname, photoURL}
           safeSend('SIGNIN_RESULT', {
             success: true,
             provider: 'kakao',

@@ -112,6 +112,56 @@ if(NOT "${NEW_GLOB}" STREQUAL "${OLD_GLOB}")
   file(TOUCH_NOCREATE "/Users/sungwon/Downloads/Develop/Mobile/wizmarketingRN/android/app/.cxx/Debug/1l293634/x86/CMakeFiles/cmake.verify_globs")
 endif()
 
+# react_codegen_SRCS at /Users/sungwon/Downloads/Develop/Mobile/wizmarketingRN/node_modules/@react-native-kakao/core/android/build/generated/source/codegen/jni/CMakeLists.txt:9 (file)
+file(GLOB NEW_GLOB LIST_DIRECTORIES true "/Users/sungwon/Downloads/Develop/Mobile/wizmarketingRN/node_modules/@react-native-kakao/core/android/build/generated/source/codegen/jni/*.cpp")
+set(OLD_GLOB
+  "/Users/sungwon/Downloads/Develop/Mobile/wizmarketingRN/node_modules/@react-native-kakao/core/android/build/generated/source/codegen/jni/RNCKakaoCoreSpec-generated.cpp"
+  )
+if(NOT "${NEW_GLOB}" STREQUAL "${OLD_GLOB}")
+  message("-- GLOB mismatch!")
+  file(TOUCH_NOCREATE "/Users/sungwon/Downloads/Develop/Mobile/wizmarketingRN/android/app/.cxx/Debug/1l293634/x86/CMakeFiles/cmake.verify_globs")
+endif()
+
+# react_codegen_SRCS at /Users/sungwon/Downloads/Develop/Mobile/wizmarketingRN/node_modules/@react-native-kakao/core/android/build/generated/source/codegen/jni/CMakeLists.txt:9 (file)
+file(GLOB NEW_GLOB LIST_DIRECTORIES true "/Users/sungwon/Downloads/Develop/Mobile/wizmarketingRN/node_modules/@react-native-kakao/core/android/build/generated/source/codegen/jni/react/renderer/components/RNCKakaoCoreSpec/*.cpp")
+set(OLD_GLOB
+  "/Users/sungwon/Downloads/Develop/Mobile/wizmarketingRN/node_modules/@react-native-kakao/core/android/build/generated/source/codegen/jni/react/renderer/components/RNCKakaoCoreSpec/ComponentDescriptors.cpp"
+  "/Users/sungwon/Downloads/Develop/Mobile/wizmarketingRN/node_modules/@react-native-kakao/core/android/build/generated/source/codegen/jni/react/renderer/components/RNCKakaoCoreSpec/EventEmitters.cpp"
+  "/Users/sungwon/Downloads/Develop/Mobile/wizmarketingRN/node_modules/@react-native-kakao/core/android/build/generated/source/codegen/jni/react/renderer/components/RNCKakaoCoreSpec/Props.cpp"
+  "/Users/sungwon/Downloads/Develop/Mobile/wizmarketingRN/node_modules/@react-native-kakao/core/android/build/generated/source/codegen/jni/react/renderer/components/RNCKakaoCoreSpec/RNCKakaoCoreSpecJSI-generated.cpp"
+  "/Users/sungwon/Downloads/Develop/Mobile/wizmarketingRN/node_modules/@react-native-kakao/core/android/build/generated/source/codegen/jni/react/renderer/components/RNCKakaoCoreSpec/ShadowNodes.cpp"
+  "/Users/sungwon/Downloads/Develop/Mobile/wizmarketingRN/node_modules/@react-native-kakao/core/android/build/generated/source/codegen/jni/react/renderer/components/RNCKakaoCoreSpec/States.cpp"
+  )
+if(NOT "${NEW_GLOB}" STREQUAL "${OLD_GLOB}")
+  message("-- GLOB mismatch!")
+  file(TOUCH_NOCREATE "/Users/sungwon/Downloads/Develop/Mobile/wizmarketingRN/android/app/.cxx/Debug/1l293634/x86/CMakeFiles/cmake.verify_globs")
+endif()
+
+# react_codegen_SRCS at /Users/sungwon/Downloads/Develop/Mobile/wizmarketingRN/node_modules/@react-native-kakao/user/android/build/generated/source/codegen/jni/CMakeLists.txt:9 (file)
+file(GLOB NEW_GLOB LIST_DIRECTORIES true "/Users/sungwon/Downloads/Develop/Mobile/wizmarketingRN/node_modules/@react-native-kakao/user/android/build/generated/source/codegen/jni/*.cpp")
+set(OLD_GLOB
+  "/Users/sungwon/Downloads/Develop/Mobile/wizmarketingRN/node_modules/@react-native-kakao/user/android/build/generated/source/codegen/jni/RNCKakaoUserSpec-generated.cpp"
+  )
+if(NOT "${NEW_GLOB}" STREQUAL "${OLD_GLOB}")
+  message("-- GLOB mismatch!")
+  file(TOUCH_NOCREATE "/Users/sungwon/Downloads/Develop/Mobile/wizmarketingRN/android/app/.cxx/Debug/1l293634/x86/CMakeFiles/cmake.verify_globs")
+endif()
+
+# react_codegen_SRCS at /Users/sungwon/Downloads/Develop/Mobile/wizmarketingRN/node_modules/@react-native-kakao/user/android/build/generated/source/codegen/jni/CMakeLists.txt:9 (file)
+file(GLOB NEW_GLOB LIST_DIRECTORIES true "/Users/sungwon/Downloads/Develop/Mobile/wizmarketingRN/node_modules/@react-native-kakao/user/android/build/generated/source/codegen/jni/react/renderer/components/RNCKakaoUserSpec/*.cpp")
+set(OLD_GLOB
+  "/Users/sungwon/Downloads/Develop/Mobile/wizmarketingRN/node_modules/@react-native-kakao/user/android/build/generated/source/codegen/jni/react/renderer/components/RNCKakaoUserSpec/ComponentDescriptors.cpp"
+  "/Users/sungwon/Downloads/Develop/Mobile/wizmarketingRN/node_modules/@react-native-kakao/user/android/build/generated/source/codegen/jni/react/renderer/components/RNCKakaoUserSpec/EventEmitters.cpp"
+  "/Users/sungwon/Downloads/Develop/Mobile/wizmarketingRN/node_modules/@react-native-kakao/user/android/build/generated/source/codegen/jni/react/renderer/components/RNCKakaoUserSpec/Props.cpp"
+  "/Users/sungwon/Downloads/Develop/Mobile/wizmarketingRN/node_modules/@react-native-kakao/user/android/build/generated/source/codegen/jni/react/renderer/components/RNCKakaoUserSpec/RNCKakaoUserSpecJSI-generated.cpp"
+  "/Users/sungwon/Downloads/Develop/Mobile/wizmarketingRN/node_modules/@react-native-kakao/user/android/build/generated/source/codegen/jni/react/renderer/components/RNCKakaoUserSpec/ShadowNodes.cpp"
+  "/Users/sungwon/Downloads/Develop/Mobile/wizmarketingRN/node_modules/@react-native-kakao/user/android/build/generated/source/codegen/jni/react/renderer/components/RNCKakaoUserSpec/States.cpp"
+  )
+if(NOT "${NEW_GLOB}" STREQUAL "${OLD_GLOB}")
+  message("-- GLOB mismatch!")
+  file(TOUCH_NOCREATE "/Users/sungwon/Downloads/Develop/Mobile/wizmarketingRN/android/app/.cxx/Debug/1l293634/x86/CMakeFiles/cmake.verify_globs")
+endif()
+
 # LIB_CUSTOM_SRCS at /Users/sungwon/Downloads/Develop/Mobile/wizmarketingRN/node_modules/react-native-safe-area-context/android/src/main/jni/CMakeLists.txt:12 (file)
 file(GLOB NEW_GLOB LIST_DIRECTORIES true "/Users/sungwon/Downloads/Develop/Mobile/wizmarketingRN/node_modules/react-native-safe-area-context/android/src/main/jni/*.cpp")
 set(OLD_GLOB

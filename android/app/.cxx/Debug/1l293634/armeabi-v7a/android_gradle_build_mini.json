@@ -4,6 +4,8 @@
     "/Users/sungwon/Downloads/Develop/Mobile/wizmarketingRN/node_modules/@react-native-clipboard/clipboard/android/build/generated/source/codegen/jni/CMakeLists.txt",
     "/Users/sungwon/Downloads/Develop/Mobile/wizmarketingRN/node_modules/@react-native-community/geolocation/android/build/generated/source/codegen/jni/CMakeLists.txt",
     "/Users/sungwon/Downloads/Develop/Mobile/wizmarketingRN/node_modules/@react-native-google-signin/google-signin/android/build/generated/source/codegen/jni/CMakeLists.txt",
+    "/Users/sungwon/Downloads/Develop/Mobile/wizmarketingRN/node_modules/@react-native-kakao/core/android/build/generated/source/codegen/jni/CMakeLists.txt",
+    "/Users/sungwon/Downloads/Develop/Mobile/wizmarketingRN/node_modules/@react-native-kakao/user/android/build/generated/source/codegen/jni/CMakeLists.txt",
     "/Users/sungwon/Downloads/Develop/Mobile/wizmarketingRN/node_modules/react-native-safe-area-context/android/src/main/jni/CMakeLists.txt",
     "/Users/sungwon/Downloads/Develop/Mobile/wizmarketingRN/node_modules/react-native-share/android/build/generated/source/codegen/jni/CMakeLists.txt",
     "/Users/sungwon/Downloads/Develop/Mobile/wizmarketingRN/node_modules/react-native-webview/android/build/generated/source/codegen/jni/CMakeLists.txt",
@@ -43,6 +45,16 @@
         "/Users/sungwon/.gradle/caches/8.14.3/transforms/879da7bfb9444fea821ffebabfd5623d/transformed/react-android-0.81.0-debug/prefab/modules/jsi/libs/android.armeabi-v7a/libjsi.so",
         "/Users/sungwon/.gradle/caches/8.14.3/transforms/879da7bfb9444fea821ffebabfd5623d/transformed/react-android-0.81.0-debug/prefab/modules/reactnative/libs/android.armeabi-v7a/libreactnative.so"
       ]
+    },
+    "react_codegen_RNCKakaoCoreSpec::@e55f8631252a7cf38f6b": {
+      "artifactName": "react_codegen_RNCKakaoCoreSpec",
+      "abi": "armeabi-v7a",
+      "runtimeFiles": []
+    },
+    "react_codegen_RNCKakaoUserSpec::@5995240f05f433b2da7d": {
+      "artifactName": "react_codegen_RNCKakaoUserSpec",
+      "abi": "armeabi-v7a",
+      "runtimeFiles": []
     },
     "react_codegen_RNCWebViewSpec::@eb48929f9f7453740a6c": {
       "artifactName": "react_codegen_RNCWebViewSpec",

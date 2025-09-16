@@ -42,6 +42,17 @@ class MainApplication : Application(), ReactApplication {
     super.onCreate()
     android.util.Log.i("KAKAO", "AppKey=" + BuildConfig.KAKAO_NATIVE_APP_KEY)
 
+    android.util.Log.i(
+        "KAKAO",
+        "AppId=" +
+                BuildConfig.APPLICATION_ID +
+                ", BuildType=" +
+                BuildConfig.BUILD_TYPE +
+                ", KakaoKey=" +
+                BuildConfig.KAKAO_NATIVE_APP_KEY
+)
+
+
     KakaoSdk.init(this, BuildConfig.KAKAO_NATIVE_APP_KEY)
 
     loadReactNative(this)

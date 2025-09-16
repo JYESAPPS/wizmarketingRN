@@ -23,8 +23,7 @@
       <!-- ✅ Kakao SDK AppKey (머지 충돌 시 우리 값으로 강제) -->
       <meta-data
           android:name="com.kakao.sdk.AppKey"
-          android:value="@string/kakao_native_app_key"
-          tools:replace="android:value" />
+          android:value="@string/kakao_app_key" />
 
       <!-- 커스텀(유지) -->
       <provider
@@ -70,9 +69,7 @@
           <category android:name="android.intent.category.DEFAULT"/>
           <category android:name="android.intent.category.BROWSABLE"/>
           <!-- ✅ 하드코딩 대신 리소스 참조로 통일 -->
-          <data
-            android:scheme="kakao@string/kakao_native_app_key"
-            android:host="oauth"/>
+         <data android:scheme="@string/kakao_custom_scheme" android:host="oauth" />
         </intent-filter>
 
       </activity>

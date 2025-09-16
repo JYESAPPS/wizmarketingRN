@@ -18,6 +18,8 @@
     "@react-native-firebase/auth": "^23.3.1",
     "@react-native-firebase/messaging": "^23.3.1",
     "@react-native-google-signin/google-signin": "^16.0.0",
+    "@react-native-kakao/core": "^2.4.0",
+    "@react-native-kakao/user": "^2.4.0",
     "@react-native-seoul/kakao-login": "^5.4.1",
     "react": "19.1.0",
     "react-native": "0.81.0",
