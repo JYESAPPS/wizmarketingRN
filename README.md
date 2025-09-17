@@ -112,6 +112,11 @@ https://wizad-b69ee.web.app/
 
 http://www.wizmarket.ai:53003/ads/login/MA010120220808570604
 
-
+카카오디벨롭센터
 help@sohomsg.kr
 jyes0622@
+
+
+네이버 개발자
+ID: jyesbizz
+PW: yes606!!

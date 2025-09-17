@@ -32,6 +32,8 @@ const APP_VERSION = '1.0.0';
 const BOOT_TIMEOUT_MS = 8000;
 const MIN_SPLASH_MS = 1200;
 const TAG = '[WizApp]';
+const NAVER_AUTH_URL = 'https://nid.naver.com/oauth2.0/authorize';
+const NAVER_CLIENT_ID = 'YSd2iMy0gj8Da9MZ4Unf'; // 콘솔에서 발급받은 값
 
 // ─────────── Google Sign-In 초기화 ───────────
 GoogleSignin.configure({
@@ -51,6 +53,32 @@ const SOCIAL_MAP = {
   NAVER: 'NAVER',
   SYSTEM: 'SYSTEM',
 };
+
+
+
+
+
+// 구조화 로그
+const logJSON = (tag, obj) => console.log(`${tag} ${safeStringify(obj)}`);
+
+const replacer = (_k, v) => {
+  if (v instanceof Error) return { name: v.name, message: v.message, stack: v.stack };
+  if (typeof v === 'bigint') return String(v);
+  return v;
+};
+const safeStringify = (v, max = 100000) => {
+  try {
+    const s = JSON.stringify(v, replacer, 2);
+    return s.length > max ? s.slice(0, max) + '…(trunc)' : s;
+  } catch (e) {
+    return `<non-serializable: ${String(e?.message || e)}>`;
+  }
+};
+const logChunked = (tag, obj, size = 3000) => {
+  const s = safeStringify(obj);
+  for (let i = 0; i < s.length; i += size) console.log(`${tag}[${1 + (i / size) | 0}] ${s.slice(i, i + size)}`);
+};
+
 
 function buildFinalText({ caption, hashtags = [], couponEnabled = false, link } = {}) {
   const tags = Array.isArray(hashtags) ? hashtags.join(' ') : (hashtags || '');
@@ -744,6 +772,44 @@ const App = () => {
         }
       }
 
+      if (provider === 'naver') {
+        try {
+          const { redirectUri, state } = payload || {};
+          if (!redirectUri || !state) throw new Error('invalid_payload');
+
+          // ✅ 마지막 슬래시 보정 (권한창/교환 모두 동일하도록)
+          const ensureSlash = (u) => (u.endsWith('/') ? u : u + '/');
+          const ru = ensureSlash(redirectUri);
+
+
+
+          const authUrl =
+            `${NAVER_AUTH_URL}?response_type=code` +
+            `&client_id=${encodeURIComponent(NAVER_CLIENT_ID)}` +
+            `&redirect_uri=${encodeURIComponent(ru)}` +     // ← 보정된 ru 사용
+            `&state=${encodeURIComponent(state)}`;
+
+          console.log('[NAVER_DEBUG] authorizeURL', authUrl);
+
+          // WebView 내부에서 이동해야 세션 쿠키 유지
+          const js = `location.href='${authUrl.replace(/'/g, "\\'")}'; true;`;
+          webViewRef.current?.injectJavaScript(js);
+
+  
+          safeSend('NAVER_LOGIN_STARTED', { at: Date.now() });
+          return;
+        } catch (e) {
+          safeSend('SIGNIN_RESULT', {
+            success: false,
+            provider: 'naver',
+            error_code: 'naver_start_failed',
+            error_message: String(e?.message || e),
+          });
+          return;
+        }
+      }
+
+
       throw new Error('unsupported_provider');
     } catch (err) {
       const code =
@@ -911,7 +977,42 @@ const App = () => {
           }
           break;
         }
+          
+        case 'NAVER_LOGIN_DONE': {
+          const payload = data.payload || {};
+          const ok = !!payload.success;
+          const err = payload.error || payload.error_code || null;
 
+          // 콘솔에 풍부하게 찍기
+          if (true) {
+            console.groupCollapsed(`[NAVER_LOGIN_DONE] success=${ok}${err ? ` error=${err}` : ''}`);
+            console.table({
+              success: ok,
+              error: err || '',
+              uid: payload.uid || '',
+              mock: payload.mock ? 'yes' : 'no',
+              at: new Date().toISOString(),
+            });
+            // payload 전체도 chunk로 남겨두기
+            logChunked('[NAVER_LOGIN_DONE] payload', payload);
+            console.groupEnd();
+          } else {
+            logJSON('[NAVER_LOGIN_DONE]', payload);
+          }
+
+  
+
+          // (선택) 웹에 ACK
+          sendToWeb('NAVER_LOGIN_ACK', { success: ok, at: Date.now(), error: err || undefined });
+
+          break; // ✅ 반드시 break
+        }
+          
+        case 'NAVER_DEBUG': {
+          logChunked('[NAVER_DEBUG data]', data);
+          logChunked('[NAVER_DEBUG payload]', data.payload);
+          break;
+        }
         default: console.log('⚠️ unknown msg:', data.type);
       }
     } catch (err) {
@@ -934,7 +1035,7 @@ const App = () => {
         <StatusBar barStyle="dark-content" backgroundColor="#ffffff" />
         <WebView
           ref={webViewRef}
-          source={{ uri: 'http://www.wizmarket.ai:53003/ads/login/MA010120220808570604' }}
+          source={{ uri: 'https://wizad-b69ee.web.app/' }}
           onMessage={onMessageFromWeb}
           onLoadStart={onWebViewLoadStart}
           onLoadProgress={({ nativeEvent }) => {
