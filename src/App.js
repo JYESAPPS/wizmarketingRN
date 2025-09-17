@@ -528,86 +528,19 @@ async function handleShareToChannel(payload, sendToWeb) {
 }
 
 
-// async function handleShareToChannel(payload, sendToWeb) {
-//   const key = (payload?.social || '').toUpperCase();
-//   const data = payload?.data || {};
-//   const social = SOCIAL_MAP[key] ?? SOCIAL_MAP.SYSTEM;
+async function saveDataUrlToGallery(dataUrl, filename) {
+  // dataURL → base64 추출
+  const match = /^data:(.+?);base64,(.+)$/.exec(dataUrl);
+  if (!match) throw new Error('invalid_dataurl');
 
-//   const text = buildFinalText(data);
-//   let file = data.imageUrl || data.url || data.image;
+  const base64 = match[2];
+  const tmpPath = `${RNFS.CachesDirectoryPath}/${filename}`;
 
-//   try {
-//     const needClipboard = [Share.Social.INSTAGRAM, Share.Social.INSTAGRAM_STORIES, Share.Social.FACEBOOK].includes(social);
-//     if (needClipboard && text) {
-//       Clipboard.setString(text);
-//       sendToWeb('TOAST', { message: '캡션이 복사되었어요. 업로드 화면에서 붙여넣기 하세요.' });
-//     }
-
-//     const ext = guessExt(file);
-//     const mime = extToMime(ext);
-
-//     // Kakao: file:// 로 공유
-//     if (key === 'KAKAO') {
-      
-//       const src = data.imageUrl || data.url || data.image;
-//       const cleanText = safeStr(text);
-//       const pasteText = stripImageUrlsFromText(cleanText);
-
-//       const kExt = guessExt(src);
-//       const dlPath = `${RNFS.CachesDirectoryPath}/share_${Date.now()}.${kExt}`;
-//       const r = await RNFS.downloadFile({ fromUrl: src, toFile: dlPath }).promise;
-//       if (!(r && r.statusCode >= 200 && r.statusCode < 300)) {
-//         throw new Error(`download ${r?.statusCode || 'fail'}`);
-//       }
-//       const st = await RNFS.stat(dlPath);
-//       if (!st.isFile() || Number(st.size) <= 0) throw new Error('downloaded-file-empty');
-
-//       const fileUrl = `file://${dlPath}`;
-//       const kMime = extToMime(kExt);
-
-//       await Share.open({
-//         title: '카카오톡으로 공유',
-//         url: fileUrl,
-//         type: kMime,
-//         filename: `share.${kExt}`,
-//         message: pasteText,
-//         failOnCancel: false,
-//       });
-
-//       sendToWeb('SHARE_RESULT', { success: true, platform: key, post_id: null });
-//       return;
-//     }
-
-//     if (social === Share.Social.INSTAGRAM_STORIES) {
-//       await Share.shareSingle({
-//         social,
-//         backgroundImage: file,
-//         attributionURL: data.link,
-//         failOnCancel: false,
-//       });
-//       sendToWeb('SHARE_RESULT', { success: true, platform: key, post_id: null });
-//       return;
-//     }
-
-//     if (typeof social === 'string' && !['SYSTEM', 'KAKAO', 'NAVER'].includes(social)) {
-//       await Share.shareSingle({
-//         social,
-//         url: file,
-//         message: needClipboard ? undefined : text,
-//         type: mime,
-//         filename: `share.${ext}`,
-//         failOnCancel: false,
-//       });
-//       sendToWeb('SHARE_RESULT', { success: true, platform: key, post_id: null });
-//       return;
-//     }
-
-//     await Share.open({ url: file, message: text, title: '공유', type: mime, filename: `share.${ext}`, failOnCancel: false });
-//     sendToWeb('SHARE_RESULT', { success: true, platform: key, post_id: null });
-//   } catch (err) {
-//     sendToWeb('SHARE_RESULT', { success: false, platform: key, error_code: 'share_failed', message: String(err?.message || err) });
-//   }
-// }
+  // base64 → 파일
+  await RNFS.writeFile(tmpPath, base64, 'base64');
+  // 파일 → 갤러리에 저장
+  await CameraRoll.save(tmpPath, { type: 'photo' });
+}
 
 // ─────────── App 컴포넌트 ───────────
 const App = () => {
@@ -892,17 +825,23 @@ const App = () => {
 
         case 'DOWNLOAD_IMAGE': {
           try {
-            const { url, filename } = data.payload || {};
-            if (!url) throw new Error('no_url');
-
-            // 확장자 기본값 강제
+            const { url, dataUrl, filename } = data.payload || {};
             const safeName = filename && filename.includes('.') ? filename : 'image.jpg';
 
-            await downloadAndSaveToGallery(url, safeName);
+            if (url) {
+              // 🌐 URL 다운로드 → 갤러리 저장
+              await downloadAndSaveToGallery(url, safeName);
+            } else if (dataUrl) {
+              // 🖼 dataURL → 파일 디코드 → 갤러리 저장
+              await saveDataUrlToGallery(dataUrl, safeName);
+            } else {
+              throw new Error('no_url_or_dataUrl');
+            }
+
             sendToWeb('DOWNLOAD_RESULT', { success: true, filename: safeName });
             Alert.alert('완료', '이미지가 갤러리에 저장되었습니다.');
           } catch (err) {
-            console.log('[DOWNLOAD_IMAGE][error]', err); // 🔍 에러 로그 확인
+            console.log('[DOWNLOAD_IMAGE][error]', err);
             sendToWeb('DOWNLOAD_RESULT', {
               success: false,
               error_code: 'save_failed',
@@ -912,6 +851,7 @@ const App = () => {
           }
           break;
         }
+
 
         case 'GET_PUSH_TOKEN': {
           try {
