@@ -110,7 +110,7 @@ jyes / 0622
 
 https://wizad-b69ee.web.app/
 
-http://www.wizmarket.ai:53003/ads/login/MA010120220808570604
+http://www.wizmarket.ai/ads/login/MA010120220808570604
 
 카카오디벨롭센터
 help@sohomsg.kr

@@ -391,6 +391,25 @@ async function handleShareToChannel(payload, sendToWeb) {
       return;
     }
 
+    if (key === 'BLOG') {
+      // 스피너/상태 싱크하고 싶으면 먼저 신호
+      sendToWeb('NAVER_BLOG_SHARE_STARTED', { at: Date.now() });
+
+      // 웹에게: 지금 데이터로 /api/auth/naver/blogPost 호출하라고 허용
+      sendToWeb('NAVER_BLOG_CAN_POST', {
+        ok: true,
+        at: Date.now(),
+        data: {
+          title: data.caption || '제목 없음',
+          content: (data.caption || '').replace(/\n/g, '\n'),
+          imageUrl: data.imageUrl || data.image || '',
+          tags: data.hashtags || [],
+          categoryNo: 0, // 필요 시 바꿔줘
+        }
+      });
+      return;
+    }
+
     // --- Instagram Stories: 로컬 PNG + background → sticker 폴백 ---
     if (social === Share.Social.INSTAGRAM_STORIES) {
       // (안드로이드) 인스타 설치 확인
