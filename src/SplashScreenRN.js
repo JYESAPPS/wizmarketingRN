@@ -9,7 +9,7 @@ export default function SplashScreenRN({
   brandText = '#FFFFFF',     // 흰색 텍스트
   primary = '#FFFFFF',       // 흰색 도트
   logoSource,                 // 예: require('./assets/logo.png')
-  brandName = 'Wiz Market',
+  brandName = 'wizmarket',
 }) {
   const [visible, setVisible] = useState(true);
   const fade = useRef(new Animated.Value(0)).current;

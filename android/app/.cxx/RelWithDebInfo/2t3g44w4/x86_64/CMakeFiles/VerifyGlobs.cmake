@@ -12,6 +12,31 @@ if(NOT "${NEW_GLOB}" STREQUAL "${OLD_GLOB}")
   file(TOUCH_NOCREATE "/Users/sungwon/Downloads/Develop/Mobile/wizmarketingRN/android/app/.cxx/RelWithDebInfo/2t3g44w4/x86_64/CMakeFiles/cmake.verify_globs")
 endif()
 
+# react_codegen_SRCS at /Users/sungwon/Downloads/Develop/Mobile/wizmarketingRN/node_modules/@react-native-async-storage/async-storage/android/build/generated/source/codegen/jni/CMakeLists.txt:9 (file)
+file(GLOB NEW_GLOB LIST_DIRECTORIES true "/Users/sungwon/Downloads/Develop/Mobile/wizmarketingRN/node_modules/@react-native-async-storage/async-storage/android/build/generated/source/codegen/jni/*.cpp")
+set(OLD_GLOB
+  "/Users/sungwon/Downloads/Develop/Mobile/wizmarketingRN/node_modules/@react-native-async-storage/async-storage/android/build/generated/source/codegen/jni/rnasyncstorage-generated.cpp"
+  )
+if(NOT "${NEW_GLOB}" STREQUAL "${OLD_GLOB}")
+  message("-- GLOB mismatch!")
+  file(TOUCH_NOCREATE "/Users/sungwon/Downloads/Develop/Mobile/wizmarketingRN/android/app/.cxx/RelWithDebInfo/2t3g44w4/x86_64/CMakeFiles/cmake.verify_globs")
+endif()
+
+# react_codegen_SRCS at /Users/sungwon/Downloads/Develop/Mobile/wizmarketingRN/node_modules/@react-native-async-storage/async-storage/android/build/generated/source/codegen/jni/CMakeLists.txt:9 (file)
+file(GLOB NEW_GLOB LIST_DIRECTORIES true "/Users/sungwon/Downloads/Develop/Mobile/wizmarketingRN/node_modules/@react-native-async-storage/async-storage/android/build/generated/source/codegen/jni/react/renderer/components/rnasyncstorage/*.cpp")
+set(OLD_GLOB
+  "/Users/sungwon/Downloads/Develop/Mobile/wizmarketingRN/node_modules/@react-native-async-storage/async-storage/android/build/generated/source/codegen/jni/react/renderer/components/rnasyncstorage/ComponentDescriptors.cpp"
+  "/Users/sungwon/Downloads/Develop/Mobile/wizmarketingRN/node_modules/@react-native-async-storage/async-storage/android/build/generated/source/codegen/jni/react/renderer/components/rnasyncstorage/EventEmitters.cpp"
+  "/Users/sungwon/Downloads/Develop/Mobile/wizmarketingRN/node_modules/@react-native-async-storage/async-storage/android/build/generated/source/codegen/jni/react/renderer/components/rnasyncstorage/Props.cpp"
+  "/Users/sungwon/Downloads/Develop/Mobile/wizmarketingRN/node_modules/@react-native-async-storage/async-storage/android/build/generated/source/codegen/jni/react/renderer/components/rnasyncstorage/ShadowNodes.cpp"
+  "/Users/sungwon/Downloads/Develop/Mobile/wizmarketingRN/node_modules/@react-native-async-storage/async-storage/android/build/generated/source/codegen/jni/react/renderer/components/rnasyncstorage/States.cpp"
+  "/Users/sungwon/Downloads/Develop/Mobile/wizmarketingRN/node_modules/@react-native-async-storage/async-storage/android/build/generated/source/codegen/jni/react/renderer/components/rnasyncstorage/rnasyncstorageJSI-generated.cpp"
+  )
+if(NOT "${NEW_GLOB}" STREQUAL "${OLD_GLOB}")
+  message("-- GLOB mismatch!")
+  file(TOUCH_NOCREATE "/Users/sungwon/Downloads/Develop/Mobile/wizmarketingRN/android/app/.cxx/RelWithDebInfo/2t3g44w4/x86_64/CMakeFiles/cmake.verify_globs")
+endif()
+
 # react_codegen_SRCS at /Users/sungwon/Downloads/Develop/Mobile/wizmarketingRN/node_modules/@react-native-camera-roll/camera-roll/android/build/generated/source/codegen/jni/CMakeLists.txt:9 (file)
 file(GLOB NEW_GLOB LIST_DIRECTORIES true "/Users/sungwon/Downloads/Develop/Mobile/wizmarketingRN/node_modules/@react-native-camera-roll/camera-roll/android/build/generated/source/codegen/jni/*.cpp")
 set(OLD_GLOB
@@ -156,6 +181,31 @@ set(OLD_GLOB
   "/Users/sungwon/Downloads/Develop/Mobile/wizmarketingRN/node_modules/@react-native-kakao/user/android/build/generated/source/codegen/jni/react/renderer/components/RNCKakaoUserSpec/RNCKakaoUserSpecJSI-generated.cpp"
   "/Users/sungwon/Downloads/Develop/Mobile/wizmarketingRN/node_modules/@react-native-kakao/user/android/build/generated/source/codegen/jni/react/renderer/components/RNCKakaoUserSpec/ShadowNodes.cpp"
   "/Users/sungwon/Downloads/Develop/Mobile/wizmarketingRN/node_modules/@react-native-kakao/user/android/build/generated/source/codegen/jni/react/renderer/components/RNCKakaoUserSpec/States.cpp"
+  )
+if(NOT "${NEW_GLOB}" STREQUAL "${OLD_GLOB}")
+  message("-- GLOB mismatch!")
+  file(TOUCH_NOCREATE "/Users/sungwon/Downloads/Develop/Mobile/wizmarketingRN/android/app/.cxx/RelWithDebInfo/2t3g44w4/x86_64/CMakeFiles/cmake.verify_globs")
+endif()
+
+# react_codegen_SRCS at /Users/sungwon/Downloads/Develop/Mobile/wizmarketingRN/node_modules/react-native-iap/android/build/generated/source/codegen/jni/CMakeLists.txt:9 (file)
+file(GLOB NEW_GLOB LIST_DIRECTORIES true "/Users/sungwon/Downloads/Develop/Mobile/wizmarketingRN/node_modules/react-native-iap/android/build/generated/source/codegen/jni/*.cpp")
+set(OLD_GLOB
+  "/Users/sungwon/Downloads/Develop/Mobile/wizmarketingRN/node_modules/react-native-iap/android/build/generated/source/codegen/jni/RNIap-generated.cpp"
+  )
+if(NOT "${NEW_GLOB}" STREQUAL "${OLD_GLOB}")
+  message("-- GLOB mismatch!")
+  file(TOUCH_NOCREATE "/Users/sungwon/Downloads/Develop/Mobile/wizmarketingRN/android/app/.cxx/RelWithDebInfo/2t3g44w4/x86_64/CMakeFiles/cmake.verify_globs")
+endif()
+
+# react_codegen_SRCS at /Users/sungwon/Downloads/Develop/Mobile/wizmarketingRN/node_modules/react-native-iap/android/build/generated/source/codegen/jni/CMakeLists.txt:9 (file)
+file(GLOB NEW_GLOB LIST_DIRECTORIES true "/Users/sungwon/Downloads/Develop/Mobile/wizmarketingRN/node_modules/react-native-iap/android/build/generated/source/codegen/jni/react/renderer/components/RNIap/*.cpp")
+set(OLD_GLOB
+  "/Users/sungwon/Downloads/Develop/Mobile/wizmarketingRN/node_modules/react-native-iap/android/build/generated/source/codegen/jni/react/renderer/components/RNIap/ComponentDescriptors.cpp"
+  "/Users/sungwon/Downloads/Develop/Mobile/wizmarketingRN/node_modules/react-native-iap/android/build/generated/source/codegen/jni/react/renderer/components/RNIap/EventEmitters.cpp"
+  "/Users/sungwon/Downloads/Develop/Mobile/wizmarketingRN/node_modules/react-native-iap/android/build/generated/source/codegen/jni/react/renderer/components/RNIap/Props.cpp"
+  "/Users/sungwon/Downloads/Develop/Mobile/wizmarketingRN/node_modules/react-native-iap/android/build/generated/source/codegen/jni/react/renderer/components/RNIap/RNIapJSI-generated.cpp"
+  "/Users/sungwon/Downloads/Develop/Mobile/wizmarketingRN/node_modules/react-native-iap/android/build/generated/source/codegen/jni/react/renderer/components/RNIap/ShadowNodes.cpp"
+  "/Users/sungwon/Downloads/Develop/Mobile/wizmarketingRN/node_modules/react-native-iap/android/build/generated/source/codegen/jni/react/renderer/components/RNIap/States.cpp"
   )
 if(NOT "${NEW_GLOB}" STREQUAL "${OLD_GLOB}")
   message("-- GLOB mismatch!")

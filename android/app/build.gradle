@@ -2,9 +2,7 @@ apply plugin: "com.android.application"
 apply plugin: "org.jetbrains.kotlin.android"
 apply plugin: "com.facebook.react"
 
-react {
-  autolinkLibrariesWithApp()
-}
+react { autolinkLibrariesWithApp() }
 
 def enableProguardInReleaseBuilds = false
 def jscFlavor = 'io.github.react-native-community:jsc-android:2026004.+'
@@ -20,34 +18,19 @@ android {
     applicationId "com.wizmarket"
     minSdkVersion rootProject.ext.minSdkVersion
     targetSdkVersion rootProject.ext.targetSdkVersion
-    versionCode 1
-    versionName "1.0"
+    versionCode 12
+    versionName "12.0"
 
-     // 1) placeholder (scheme 용)
+    // (선택) NDK 이슈 회피
+    ndk { abiFilters "arm64-v8a" }   // 32비트 네이티브 빌드/클린 통째로 패스
+
+    // Kakao
     manifestPlaceholders = [ KAKAO_NATIVE_APP_KEY: "ef66c5836528d39100550fd6ca87f7dc" ]
-
-    // 2) @string 주입도 같은 값으로 강제
     resValue "string", "kakao_native_app_key", "ef66c5836528d39100550fd6ca87f7dc"
-
-    // 3) BuildConfig에도 동일값(선택)
     buildConfigField "String", "KAKAO_NATIVE_APP_KEY", "\"ef66c5836528d39100550fd6ca87f7dc\""
-    
-    buildTypes {
-    debug {
-      // 혹시 다른 곳에서 덮을 가능성 차단
-      manifestPlaceholders.KAKAO_NATIVE_APP_KEY = "ef66c5836528d39100550fd6ca87f7dc"
-      resValue "string", "kakao_native_app_key", "ef66c5836528d39100550fd6ca87f7dc"
-      buildConfigField "String","KAKAO_NATIVE_APP_KEY","\"ef66c5836528d39100550fd6ca87f7dc\""
-    }
-    release {
-      manifestPlaceholders.KAKAO_NATIVE_APP_KEY = "ef66c5836528d39100550fd6ca87f7dc"
-      resValue "string", "kakao_native_app_key", "ef66c5836528d39100550fd6ca87f7dc"
-      buildConfigField "String","KAKAO_NATIVE_APP_KEY","\"ef66c5836528d39100550fd6ca87f7dc\""
-    }
-    } 
 
-
-
+    // ✅ IAP store dimension 기본값을 play로
+    missingDimensionStrategy "store", "play"
   }
 
   signingConfigs {
@@ -58,9 +41,6 @@ android {
       keyPassword 'android'
     }
     release {
-      // ⚠️ gradle.properties 에 아래 4개 키가 있어야 함
-      // MYAPP_UPLOAD_STORE_FILE, MYAPP_UPLOAD_KEY_ALIAS,
-      // MYAPP_UPLOAD_STORE_PASSWORD, MYAPP_UPLOAD_KEY_PASSWORD
       storeFile file(MYAPP_UPLOAD_STORE_FILE)
       storePassword MYAPP_UPLOAD_STORE_PASSWORD
       keyAlias MYAPP_UPLOAD_KEY_ALIAS
@@ -71,27 +51,62 @@ android {
   buildTypes {
     debug {
       signingConfig signingConfigs.debug
+      // (선택) Kakao 값 재주입
+      manifestPlaceholders.KAKAO_NATIVE_APP_KEY = "ef66c5836528d39100550fd6ca87f7dc"
+      resValue "string", "kakao_native_app_key", "ef66c5836528d39100550fd6ca87f7dc"
+      buildConfigField "String","KAKAO_NATIVE_APP_KEY","\"ef66c5836528d39100550fd6ca87f7dc\""
     }
     release {
-      // ✅ 릴리즈는 release 서명 사용
       signingConfig signingConfigs.release
       minifyEnabled enableProguardInReleaseBuilds
       proguardFiles getDefaultProguardFile("proguard-android.txt"), "proguard-rules.pro"
+      manifestPlaceholders.KAKAO_NATIVE_APP_KEY = "ef66c5836528d39100550fd6ca87f7dc"
+      resValue "string", "kakao_native_app_key", "ef66c5836528d39100550fd6ca87f7dc"
+      buildConfigField "String","KAKAO_NATIVE_APP_KEY","\"ef66c5836528d39100550fd6ca87f7dc\""
     }
+  }
+
+  // ✅ IAP가 요구하는 store flavor
+  flavorDimensions "store"
+  productFlavors {
+    play { dimension "store" }
+    // amazon { dimension "store" }
+  }
+
+  // (선택) amazon 변형 전체 무시(빌드 간소화)
+  variantFilter { variant ->
+    def names = variant.flavors*.name
+    if (names.contains("amazon")) setIgnore(true)
+  }
+
+  // ✅ JDK 17 정렬
+  compileOptions {
+    sourceCompatibility JavaVersion.VERSION_17
+    targetCompatibility JavaVersion.VERSION_17
   }
 }
 
 dependencies {
-
   implementation("com.facebook.react:react-android")
   if (hermesEnabled.toBoolean()) {
     implementation("com.facebook.react:hermes-android")
   } else {
     implementation jscFlavor
   }
-  implementation(platform("com.google.firebase:firebase-bom:33.3.0"))
-  implementation "com.kakao.sdk:v2-user:2.20.6"   // 최신 가능
 
+  implementation(platform("com.google.firebase:firebase-bom:33.3.0"))
+  implementation "com.kakao.sdk:v2-user:2.20.6"
+
+  // ⚠️ IAP를 쓰는 중이면 billing-ktx를 수동으로 추가하지 마세요(중복 충돌)
+  // implementation "com.android.billingclient:billing-ktx:6.2.1"
 }
 
-apply plugin: "com.google.gms.google-services" // 맨 아래 OK
+apply plugin: "com.google.gms.google-services"
+
+// ✅ Kotlin 컴파일러 옵션(JVM 17)
+tasks.withType(org.jetbrains.kotlin.gradle.tasks.KotlinCompile).configureEach {
+  kotlinOptions {
+    jvmTarget = "17"
+    freeCompilerArgs += ["-Xjvm-default=all-compatibility"]
+  }
+}

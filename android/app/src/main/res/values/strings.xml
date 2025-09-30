@@ -1,5 +1,5 @@
 <resources>
-    <string name="app_name">Wiz Market</string>
+  <string name="app_name">wizmarket</string>
   <string name="kakao_app_key">ef66c5836528d39100550fd6ca87f7dc</string>
   <string name="kakao_custom_scheme">kakaoef66c5836528d39100550fd6ca87f7dc</string>
 </resources>
