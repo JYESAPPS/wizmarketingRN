@@ -240,7 +240,7 @@
 				{
 					"directoryIndex" : 0,
 					"id" : "appmodules::@6890427a1f51a3e7e1df",
-					"jsonFile" : "target-appmodules-RelWithDebInfo-e8101fcbbee87b485a39.json",
+					"jsonFile" : "target-appmodules-RelWithDebInfo-ec471f72151a1bef3b60.json",
 					"name" : "appmodules",
 					"projectIndex" : 0
 				},
@@ -317,7 +317,7 @@
 				{
 					"directoryIndex" : 9,
 					"id" : "react_codegen_safeareacontext::@7984cd80db47aa7b952a",
-					"jsonFile" : "target-react_codegen_safeareacontext-RelWithDebInfo-7938d4c6e812f9022ca8.json",
+					"jsonFile" : "target-react_codegen_safeareacontext-RelWithDebInfo-4260ed0ba6923bd3f7a0.json",
 					"name" : "react_codegen_safeareacontext",
 					"projectIndex" : 0
 				}
@@ -327,7 +327,7 @@
 	"kind" : "codemodel",
 	"paths" : 
 	{
-		"build" : "/Users/sungwon/Downloads/Develop/Mobile/wizmarketingRN/android/app/.cxx/RelWithDebInfo/2t3g44w4/x86",
+		"build" : "/Users/sungwon/Downloads/Develop/Mobile/wizmarketingRN/android/app/.cxx/RelWithDebInfo/2t3g44w4/x86_64",
 		"source" : "/Users/sungwon/Downloads/Develop/Mobile/wizmarketingRN/node_modules/react-native/ReactAndroid/cmake-utils/default-app-setup"
 	},
 	"version" : 

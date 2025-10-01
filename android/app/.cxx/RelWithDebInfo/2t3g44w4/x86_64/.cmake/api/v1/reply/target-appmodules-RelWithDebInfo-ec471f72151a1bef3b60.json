@@ -310,14 +310,6 @@
 	[
 		{
 			"backtrace" : 4,
-			"id" : "react_codegen_rnasyncstorage::@1596841e19ec5b9eeffe"
-		},
-		{
-			"backtrace" : 4,
-			"id" : "react_codegen_rncameraroll::@60139d220751b3dabc04"
-		},
-		{
-			"backtrace" : 4,
 			"id" : "react_codegen_rnclipboard::@6385240493dfcaf22ab7"
 		},
 		{
@@ -331,6 +323,14 @@
 		{
 			"backtrace" : 4,
 			"id" : "react_codegen_RNCKakaoCoreSpec::@e55f8631252a7cf38f6b"
+		},
+		{
+			"backtrace" : 4,
+			"id" : "react_codegen_rnasyncstorage::@1596841e19ec5b9eeffe"
+		},
+		{
+			"backtrace" : 4,
+			"id" : "react_codegen_rncameraroll::@60139d220751b3dabc04"
 		},
 		{
 			"backtrace" : 4,

@@ -310,10 +310,6 @@
 	[
 		{
 			"backtrace" : 4,
-			"id" : "react_codegen_rnasyncstorage::@1596841e19ec5b9eeffe"
-		},
-		{
-			"backtrace" : 4,
 			"id" : "react_codegen_rncameraroll::@60139d220751b3dabc04"
 		},
 		{
@@ -323,6 +319,10 @@
 		{
 			"backtrace" : 4,
 			"id" : "react_codegen_RNCGeolocationSpec::@1b959fcb56e23f7716ba"
+		},
+		{
+			"backtrace" : 4,
+			"id" : "react_codegen_rnasyncstorage::@1596841e19ec5b9eeffe"
 		},
 		{
 			"backtrace" : 4,
