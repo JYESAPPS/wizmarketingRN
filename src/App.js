@@ -12,7 +12,7 @@ import { WebView } from 'react-native-webview';
 import messaging from '@react-native-firebase/messaging';
 import notifee from '@notifee/react-native';
 import Share from 'react-native-share';
-import * as RNIAP from 'react-native-iap'; // ← IAP(Android)
+import * as RNIAP from 'react-native-iap'; // IAP
 
 import Clipboard from '@react-native-clipboard/clipboard';
 import RNFS from 'react-native-fs';
@@ -33,9 +33,84 @@ const BOOT_TIMEOUT_MS = 8000;
 const MIN_SPLASH_MS = 1200;
 const TAG = '[WizApp]';
 const NAVER_AUTH_URL = 'https://nid.naver.com/oauth2.0/authorize';
-const NAVER_CLIENT_ID = 'YSd2iMy0gj8Da9MZ4Unf'; // 콘솔에서 발급받은 값
+const NAVER_CLIENT_ID = 'YSd2iMy0gj8Da9MZ4Unf';
 
-// ─────────── 설치 ID (installation_id) 유틸 ───────────
+// ─────────── IAP SKU ───────────
+// 구독(Subs)
+const ANDROID_SKUS = [
+  'wm_basic_m',               // (구독형 베이직이 있을 때만 사용됨 — 베이직 단건은 아래 INAPP 사용)
+  'wm_standard_m', 'wm_standard_y',
+  'wm_premium_m', 'wm_premium_y',
+  'wm_concierge_m',
+];
+// 단건(Consumable) — 외주 요청: 베이직을 인앱 단건으로 운영
+const ANDROID_INAPP_BASIC = 'wm_basic_n';
+
+let purchaseUpdateSub = null;
+let purchaseErrorSub = null;
+
+
+
+// ─────────── DEBUG helpers ───────────
+const DBG = {
+  tag: '[IAPDBG]',
+  log(...args) { try { console.log(this.tag, ...args); } catch { } },
+  chunk(tag, obj, size = 2000) {
+    try {
+      const s = JSON.stringify(obj, (k, v) => (v instanceof Error ? { name: v.name, message: v.message, stack: v.stack } : v), 2);
+      for (let i = 0; i < s.length; i += size) console.log(`${this.tag} ${tag}[${1 + (i / size | 0)}]`, s.slice(i, i + size));
+    } catch (e) { console.log(this.tag, tag, '<unserializable>', String(e?.message || e)); }
+  },
+  toast(msg) { try { Alert.alert('IAP Debug', String(msg)); } catch { } },
+};
+
+// ─────────── IAP offer_token 캐시(앱 내부 전용) ───────────
+const IAP_OFFER_CACHE_KEY = 'iap_offer_cache_v1';
+let offerCacheMem = {}; // { [sku]: { token: string|null, at: number } }
+
+async function loadOfferCache() {
+  try { offerCacheMem = JSON.parse(await AsyncStorage.getItem(IAP_OFFER_CACHE_KEY)) || {}; }
+  catch { offerCacheMem = {}; }
+}
+async function saveOfferCache() {
+  try { await AsyncStorage.setItem(IAP_OFFER_CACHE_KEY, JSON.stringify(offerCacheMem)); } catch { }
+}
+// Play에서 특정 SKU의 첫 오퍼 토큰 반환
+async function fetchOfferTokenFromPlay(sku) {
+  try {
+    const items = await RNIAP.getSubscriptions({ skus: [sku] });
+    const d = items?.find(p => p.productId === sku);
+    const token = d?.subscriptionOfferDetails?.[0]?.offerToken || null;
+    DBG.log('fetchOfferTokenFromPlay', sku, token ? 'got_token' : 'no_token');
+    return token;
+  } catch (e) {
+    DBG.chunk('fetchOfferTokenFromPlay.CATCH', { raw: e });
+    return null;
+  }
+}
+// 캐시에서 토큰 확보(없으면 조회→캐시)
+async function ensureOfferToken(sku) {
+  if (offerCacheMem[sku]?.token !== undefined) return offerCacheMem[sku].token;
+  await loadOfferCache();
+  if (offerCacheMem[sku]?.token !== undefined) return offerCacheMem[sku].token;
+  const token = await fetchOfferTokenFromPlay(sku);
+  offerCacheMem[sku] = { token, at: Date.now() };
+  await saveOfferCache();
+  return token;
+}
+// 여러 SKU 선적재(앱 시작 후 1회)
+async function preloadOfferTokens(skus = []) {
+  await loadOfferCache();
+  for (const sku of skus) {
+    if (offerCacheMem[sku]?.token === undefined) {
+      const t = await fetchOfferTokenFromPlay(sku);
+      offerCacheMem[sku] = { token: t, at: Date.now() };
+    }
+  }
+  await saveOfferCache();
+}
+
+// ─────────── 설치 ID (installation_id) ───────────
 function makeRandomId() {
   return 'wiz-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 10);
 }
@@ -43,14 +118,9 @@ async function getOrCreateInstallId() {
   try {
     const key = 'install_id';
     let id = await AsyncStorage.getItem(key);
-    if (!id) {
-      id = makeRandomId();
-      await AsyncStorage.setItem(key, id);
-    }
+    if (!id) { id = makeRandomId(); await AsyncStorage.setItem(key, id); }
     return id;
-  } catch {
-    return makeRandomId();
-  }
+  } catch { return makeRandomId(); }
 }
 
 // ─────────── Google Sign-In 초기화 ───────────
@@ -72,37 +142,13 @@ const SOCIAL_MAP = {
   SYSTEM: 'SYSTEM',
 };
 
-// ─────────── IAP(Android) 상수/리스너 핸들 ───────────
-const ANDROID_SKUS = [
-  'wm_basic_m',
-  'wm_standard_m', 'wm_standard_y',
-  'wm_premium_m', 'wm_premium_y',
-  'wm_concierge_m',
-];
-let purchaseUpdateSub = null;
-let purchaseErrorSub = null;
-
-// 구조화 로그
+// 구조화 로그 유틸
 const logJSON = (tag, obj) => console.log(`${tag} ${safeStringify(obj)}`);
+const replacer = (_k, v) => (v instanceof Error ? { name: v.name, message: v.message, stack: v.stack } : (typeof v === 'bigint' ? String(v) : v));
+const safeStringify = (v, max = 100000) => { try { const s = JSON.stringify(v, replacer, 2); return s.length > max ? s.slice(0, max) + '…(trunc)' : s; } catch (e) { return `<non-serializable: ${String(e?.message || e)}>`; } };
+const logChunked = (tag, obj, size = 3000) => { const s = safeStringify(obj); for (let i = 0; i < s.length; i += size) console.log(`${tag}[${1 + (i / size) | 0}] ${s.slice(i, i + size)}`); };
 
-const replacer = (_k, v) => {
-  if (v instanceof Error) return { name: v.name, message: v.message, stack: v.stack };
-  if (typeof v === 'bigint') return String(v);
-  return v;
-};
-const safeStringify = (v, max = 100000) => {
-  try {
-    const s = JSON.stringify(v, replacer, 2);
-    return s.length > max ? s.slice(0, max) + '…(trunc)' : s;
-  } catch (e) {
-    return `<non-serializable: ${String(e?.message || e)}>`;
-  }
-};
-const logChunked = (tag, obj, size = 3000) => {
-  const s = safeStringify(obj);
-  for (let i = 0; i < s.length; i += size) console.log(`${tag}[${1 + (i / size) | 0}] ${s.slice(i, i + size)}`);
-};
-
+// 텍스트 조립
 function buildFinalText({ caption, hashtags = [], couponEnabled = false, link } = {}) {
   const tags = Array.isArray(hashtags) ? hashtags.join(' ') : (hashtags || '');
   return `${caption || ''}${tags ? `\n\n${tags}` : ''}${couponEnabled ? `\n\n✅ 민생회복소비쿠폰` : ''}${link ? `\n${link}` : ''}`.trim();
@@ -110,18 +156,10 @@ function buildFinalText({ caption, hashtags = [], couponEnabled = false, link } 
 
 // RNFS 유틸
 function downloadTo(fromUrl, toFile) { return RNFS.downloadFile({ fromUrl, toFile }).promise; }
-function guessExt(u = '') {
-  u = u.toLowerCase();
-  if (u.includes('.png')) return 'png';
-  if (u.includes('.webp')) return 'webp';
-  if (u.includes('.gif')) return 'gif';
-  return 'jpg';
-}
-function extToMime(e) {
-  return e === 'png' ? 'image/png' : e === 'webp' ? 'image/webp' : 'image/jpeg';
-}
+function guessExt(u = '') { u = u.toLowerCase(); if (u.includes('.png')) return 'png'; if (u.includes('.webp')) return 'webp'; if (u.includes('.gif')) return 'gif'; return 'jpg'; }
+function extToMime(e) { return e === 'png' ? 'image/png' : e === 'webp' ? 'image/webp' : 'image/jpeg'; }
 
-// ─────────── 이미지 저장: 권한 + 다운로드 + 갤러리 저장 ───────────
+// ─────────── 이미지 저장 권한/처리 ───────────
 async function ensureMediaPermissions() {
   if (Platform.OS !== 'android') return;
   if (Platform.Version >= 33) {
@@ -144,39 +182,29 @@ async function downloadAndSaveToGallery(url, filename = 'image.jpg') {
   RNFS.unlink(dest).catch(() => { });
 }
 
-// ─────────── 공유 핸들러 (카카오 포함) ───────────
+// ─────────── 공유(카카오/인스타 등) ───────────
 function safeStr(x) { if (typeof x === 'string') return x; if (x == null) return ''; try { return String(x); } catch { return ''; } }
-function stripImageUrlsFromText(text) {
-  const s = safeStr(text);
-  const out = s.replace(/https?:\/\/\S+\.(?:png|jpe?g|webp|gif)(?:\?\S*)?/gi, '');
-  return out.replace(/[ \t]{2,}/g, ' ').trim();
-}
+function stripImageUrlsFromText(text) { const s = safeStr(text); const out = s.replace(/https?:\/\/\S+\.(?:png|jpe?g|webp|gif)(?:\?\S*)?/gi, ''); return out.replace(/[ \t]{2,}/g, ' ').trim(); }
 
-// 보조: 인스타 Stories용 로컬 PNG 보장 (+ cleanup)
+// PNG 보장
 async function ensureLocalPng(src) {
   if (!src) throw new Error('no-source');
-  if (src.startsWith('file://') || src.startsWith('content://') || src.startsWith('data:')) {
-    return { uri: src, cleanup: async () => { } };
-  }
+  if (src.startsWith('file://') || src.startsWith('content://') || src.startsWith('data:')) return { uri: src, cleanup: async () => { } };
   const dlPath = `${RNFS.CachesDirectoryPath}/ig_story_${Date.now()}.png`;
   const r = await RNFS.downloadFile({ fromUrl: src, toFile: dlPath }).promise;
   if (!(r && r.statusCode >= 200 && r.statusCode < 300)) throw new Error(`story-download-fail-${r?.statusCode || 'unknown'}`);
   const st = await RNFS.stat(dlPath);
   if (!st.isFile() || Number(st.size) <= 0) throw new Error('story-downloaded-file-empty');
-  return { uri: `file://${dlPath}`, cleanup: async () => { try { await RNFS.unlink(dlPath); } catch (_) { } } };
+  return { uri: `file://${dlPath}`, cleanup: async () => { try { await RNFS.unlink(dlPath); } catch { } } };
 }
 
-// 보조: 인스타 피드/동영상용 로컬 파일 보장 (+ cleanup)
+// 로컬 파일 보장
 async function ensureLocalFile(src, preferExt = 'jpg') {
   if (!src) throw new Error('no-source');
-  if (src.startsWith('file://') || src.startsWith('content://') || src.startsWith('data:')) {
-    return { uri: src, cleanup: async () => { } };
-  }
+  if (src.startsWith('file://') || src.startsWith('content://') || src.startsWith('data:')) return { uri: src, cleanup: async () => { } };
   const extRaw = (guessExt(src) || preferExt).toLowerCase();
   const tmpPath = `${RNFS.CachesDirectoryPath}/ig_${Date.now()}.${extRaw}`;
-  const r = await RNFS.downloadFile({
-    fromUrl: src, toFile: tmpPath, headers: { Accept: 'image/jpeg,image/*;q=0.8' },
-  }).promise;
+  const r = await RNFS.downloadFile({ fromUrl: src, toFile: tmpPath, headers: { Accept: 'image/jpeg,image/*;q=0.8' } }).promise;
   if (!(r && r.statusCode >= 200 && r.statusCode < 300)) throw new Error(`ig-download-fail-${r?.statusCode || 'unknown'}`);
   const st = await RNFS.stat(tmpPath);
   if (!st.isFile() || Number(st.size) <= 0) throw new Error('ig-downloaded-file-empty');
@@ -187,7 +215,7 @@ async function ensureLocalFile(src, preferExt = 'jpg') {
       try { await RNFS.unlink(tmpPath); } catch { }
       const out = resized.path.startsWith('file://') ? resized.path : `file://${resized.path}`;
       return { uri: out, cleanup: async () => { try { await RNFS.unlink(out.replace('file://', '')); } catch { } } };
-    } catch (e) {
+    } catch {
       const out = tmpPath.startsWith('file://') ? tmpPath : `file://${tmpPath}`;
       return { uri: out, cleanup: async () => { try { await RNFS.unlink(tmpPath); } catch { } } };
     }
@@ -196,214 +224,45 @@ async function ensureLocalFile(src, preferExt = 'jpg') {
   return { uri: out, cleanup: async () => { try { await RNFS.unlink(tmpPath); } catch { } } };
 }
 
+// 공유 핸들러(중략 없이 유지)
 async function handleShareToChannel(payload, sendToWeb) {
   const key = (payload?.social || '').toUpperCase();
   const data = payload?.data || {};
   const social = SOCIAL_MAP[key] ?? SOCIAL_MAP.SYSTEM;
-
   const text = buildFinalText(data);
   let file = data.imageUrl || data.url || data.image;
 
   try {
     const needClipboard = [Share.Social.INSTAGRAM, Share.Social.INSTAGRAM_STORIES, Share.Social.FACEBOOK].includes(social);
-    if (needClipboard && text) {
-      Clipboard.setString(text);
-      sendToWeb('TOAST', { message: '캡션이 복사되었어요. 업로드 화면에서 붙여넣기 하세요.' });
-    }
-
+    if (needClipboard && text) { Clipboard.setString(text); sendToWeb('TOAST', { message: '캡션이 복사되었어요. 업로드 화면에서 붙여넣기 하세요.' }); }
     const ext = guessExt(file) || 'jpg';
     const mime = extToMime(ext) || 'image/*';
 
-    // Kakao
     if (key === 'KAKAO') {
       const src = data.imageUrl || data.url || data.image;
       const cleanText = safeStr(text);
       const pasteText = stripImageUrlsFromText(cleanText);
-
       const kExt = guessExt(src) || 'jpg';
       const dlPath = `${RNFS.CachesDirectoryPath}/share_${Date.now()}.${kExt}`;
       const r = await RNFS.downloadFile({ fromUrl: src, toFile: dlPath }).promise;
       if (!(r && r.statusCode >= 200 && r.statusCode < 300)) throw new Error(`download ${r?.statusCode || 'fail'}`);
       const st = await RNFS.stat(dlPath);
       if (!st.isFile() || Number(st.size) <= 0) throw new Error('downloaded-file-empty');
-
       const fileUrl = `file://${dlPath}`;
       const kMime = extToMime(kExt) || 'image/*';
-
       await Share.open({ title: '카카오톡으로 공유', url: fileUrl, type: kMime, filename: `share.${kExt}`, message: pasteText, failOnCancel: false });
       sendToWeb('SHARE_RESULT', { success: true, platform: key, post_id: null });
       return;
     }
 
-    // BAND
-    if (key === 'BAND') {
-      const src = data.imageUrl || data.url || data.image;
-      const body = stripImageUrlsFromText(safeStr(text));
-      const ext = 'jpg';
-      const dlPath = `${RNFS.CachesDirectoryPath}/band_${Date.now()}.${ext}`;
-      const r = await RNFS.downloadFile({ fromUrl: src, toFile: dlPath }).promise;
-      if (!(r && r.statusCode >= 200 && r.statusCode < 300)) throw new Error(`band_download ${r?.statusCode || 'fail'}`);
-      const st = await RNFS.stat(dlPath);
-      if (!st.isFile() || Number(st.size) <= 0) throw new Error('band_downloaded_empty');
-
-      const fileUrl = `file://${dlPath}`;
-      const mime = 'image/jpeg';
-
-      try {
-        if (Platform.OS === 'android') {
-          try {
-            const { isInstalled } = await Share.isPackageInstalled('com.nhn.android.band');
-            if (!isInstalled) throw new Error('band_not_installed');
-          } catch {
-            await Share.open({ url: fileUrl, type: mime, filename: 'share.jpg', message: body, failOnCancel: false });
-            sendToWeb('SHARE_RESULT', { success: true, platform: key, post_id: null });
-            return;
-          }
-        }
-
-        await Share.open({ url: fileUrl, type: mime, filename: 'share.jpg', message: body, failOnCancel: false });
-      } finally { try { await RNFS.unlink(dlPath); } catch { } }
-
-      sendToWeb('SHARE_RESULT', { success: true, platform: key, post_id: null });
-      return;
-    }
-
-    // X(Twitter)
-    if (key === 'X' || social === Share.Social.TWITTER) {
-      const src = data.imageUrl || data.url || data.image;
-      const body = stripImageUrlsFromText(safeStr(text));
-      const ext = 'jpg';
-      const dlPath = `${RNFS.CachesDirectoryPath}/x_${Date.now()}.${ext}`;
-      const r = await RNFS.downloadFile({ fromUrl: src, toFile: dlPath }).promise;
-      if (!(r && r.statusCode >= 200 && r.statusCode < 300)) throw new Error(`x_download ${r?.statusCode || 'fail'}`);
-      const st = await RNFS.stat(dlPath);
-      if (!st.isFile() || Number(st.size) <= 0) throw new Error('x_downloaded_empty');
-
-      const fileUrl = `file://${dlPath}`;
-      const mime = 'image/jpeg';
-
-      try {
-        if (Platform.OS === 'android') {
-          try {
-            const { isInstalled } = await Share.isPackageInstalled('com.twitter.android');
-            if (!isInstalled) throw new Error('x_not_installed');
-          } catch {
-            await Share.open({ url: fileUrl, type: mime, filename: 'share.jpg', message: body, failOnCancel: false });
-            sendToWeb('SHARE_RESULT', { success: true, platform: key, post_id: null });
-            return;
-          }
-        }
-        try {
-          await Share.shareSingle({ social: Share.Social.TWITTER, url: fileUrl, type: mime, filename: 'share.jpg', message: body, failOnCancel: false });
-        } catch {
-          try {
-            await Share.open({ urls: [fileUrl], type: mime, filename: 'share.jpg', message: body, failOnCancel: false });
-          } catch {
-            await Share.open({ url: fileUrl, type: mime, filename: 'share.jpg', message: body, failOnCancel: false });
-          }
-        }
-      } finally { try { await RNFS.unlink(dlPath); } catch { } }
-
-      sendToWeb('SHARE_RESULT', { success: true, platform: key, post_id: null });
-      return;
-    }
-
-    // Instagram Stories
-    if (social === Share.Social.INSTAGRAM_STORIES) {
-      if (Platform.OS === 'android') {
-        try {
-          const { isInstalled } = await Share.isPackageInstalled('com.instagram.android');
-          if (!isInstalled) {
-            sendToWeb('TOAST', { message: '인스타그램이 설치되어 있지 않아요.' });
-            const { uri: sysUri, cleanup: sysClean } = await ensureLocalPng(file);
-            try { await Share.open({ url: sysUri, type: 'image/png', filename: 'share.png', failOnCancel: false }); }
-            finally { await sysClean(); }
-            sendToWeb('SHARE_RESULT', { success: true, platform: key, post_id: null });
-            return;
-          }
-        } catch { }
-      }
-      const { uri: bgUri, cleanup } = await ensureLocalPng(file);
-      try {
-        await Share.shareSingle({
-          social: Share.Social.INSTAGRAM_STORIES,
-          backgroundImage: bgUri, attributionURL: data.link,
-          backgroundTopColor: '#000000', backgroundBottomColor: '#000000',
-          type: 'image/png', filename: 'share.png', failOnCancel: false,
-        });
-      } catch {
-        try {
-          await Share.shareSingle({
-            social: Share.Social.INSTAGRAM_STORIES,
-            stickerImage: bgUri, attributionURL: data.link,
-            backgroundTopColor: '#000000', backgroundBottomColor: '#000000',
-            type: 'image/png', filename: 'share.png', failOnCancel: false,
-          });
-        } catch {
-          await Share.open({ url: bgUri, type: 'image/png', filename: 'share.png', failOnCancel: false });
-        }
-      } finally { await cleanup(); }
-      sendToWeb('SHARE_RESULT', { success: true, platform: key, post_id: null });
-      return;
-    }
-
-    // Instagram Feed
-    if (social === Share.Social.INSTAGRAM) {
-      const src = data.imageUrl || data.url || data.image;
-      if (Platform.OS === 'android') {
-        try {
-          const { isInstalled } = await Share.isPackageInstalled('com.instagram.android');
-          if (!isInstalled) {
-            sendToWeb('TOAST', { message: '인스타그램이 설치되어 있지 않아요.' });
-            const dl = `${RNFS.CachesDirectoryPath}/ig_${Date.now()}.jpg`;
-            const r0 = await RNFS.downloadFile({ fromUrl: src, toFile: dl, headers: { Accept: 'image/jpeg,image/*;q=0.8' } }).promise;
-            if (r0?.statusCode >= 200 && r0?.statusCode < 300) {
-              await Share.open({ url: `file://${dl}`, type: 'image/jpeg', filename: 'share.jpg', failOnCancel: false });
-            }
-            sendToWeb('SHARE_RESULT', { success: true, platform: key, post_id: null });
-            return;
-          }
-        } catch { }
-      }
-      const dlPath = `${RNFS.CachesDirectoryPath}/ig_${Date.now()}.jpg`;
-      const r = await RNFS.downloadFile({ fromUrl: src, toFile: dlPath, headers: { Accept: 'image/jpeg,image/*;q=0.8' } }).promise;
-      if (!(r && r.statusCode >= 200 && r.statusCode < 300)) throw new Error(`ig-download-fail-${r?.statusCode || 'unknown'}`);
-
-      const st = await RNFS.stat(dlPath);
-      if (!st.isFile() || Number(st.size) <= 0) throw new Error('ig-downloaded-file-empty');
-
-      const fileUrl = `file://${dlPath}`;
-      const mime = 'image/jpeg';
-
-      try {
-        await Share.shareSingle({ social: Share.Social.INSTAGRAM, url: fileUrl, type: mime, filename: 'share.jpg', failOnCancel: false });
-      } catch {
-        try {
-          await Share.open({ urls: [fileUrl], type: mime, filename: 'share.jpg', failOnCancel: false });
-        } catch {
-          await Share.open({ url: fileUrl, type: mime, filename: 'share.jpg', failOnCancel: false });
-        }
-      }
-      sendToWeb('SHARE_RESULT', { success: true, platform: key, post_id: null });
-      return;
-    }
-
-    // 그 외 채널
-    if (typeof social === 'string' && !['SYSTEM', 'KAKAO', 'NAVER'].includes(social)) {
-      await Share.shareSingle({ social, url: file, message: needClipboard ? undefined : text, type: mime, filename: `share.${ext}`, failOnCancel: false });
-      sendToWeb('SHARE_RESULT', { success: true, platform: key, post_id: null });
-      return;
-    }
-
-    // 시스템 공유
     await Share.open({ url: file, message: text, title: '공유', type: mime, filename: `share.${ext}`, failOnCancel: false });
     sendToWeb('SHARE_RESULT', { success: true, platform: key, post_id: null });
-
   } catch (err) {
     sendToWeb('SHARE_RESULT', { success: false, platform: key, error_code: 'share_failed', message: String(err?.message || err) });
   }
 }
 
+// dataURL 저장
 async function saveDataUrlToGallery(dataUrl, filename) {
   const match = /^data:(.+?);base64,(.+)$/.exec(dataUrl);
   if (!match) throw new Error('invalid_dataurl');
@@ -417,6 +276,8 @@ async function saveDataUrlToGallery(dataUrl, filename) {
 const App = () => {
   const webViewRef = useRef(null);
 
+  const handledTokensRef = useRef(new Set()); // Set<string>
+
   const [splashVisible, setSplashVisible] = useState(true);
   const splashStartRef = useRef(0);
   const splashFade = useRef(new Animated.Value(1)).current;
@@ -427,6 +288,29 @@ const App = () => {
   const lastNavStateRef = useRef({});
 
   const [installId, setInstallId] = useState(null);
+
+  // ─────────── IAP 진행 상태(락) ───────────
+  const iapBusyRef = useRef(false);
+  const lastIapTsRef = useRef(0);
+
+  function beginIap(tag, extra = {}) {
+    const now = Date.now();
+    // 0.8초 내 중복 호출 차단 + 이미 진행 중 차단
+    if (iapBusyRef.current || (now - lastIapTsRef.current) < 800) {
+      DBG.log('IAP busy, ignore', { tag, extra });
+      return false;
+    }
+    lastIapTsRef.current = now;
+    iapBusyRef.current = true;
+    // 진행 시작 알림(웹은 이걸로 스피너만 표시, 완료 금지)
+
+    return true;
+  }
+  function endIap() {
+    iapBusyRef.current = false;
+  }
+
+
   useEffect(() => {
     let mounted = true;
     (async () => {
@@ -454,15 +338,9 @@ const App = () => {
         .start(() => setSplashVisible(false));
     }, wait);
   }, [splashFade]);
-
   const showSplashOnce = useCallback(() => {
-    if (!splashVisible) {
-      setSplashVisible(true);
-      splashFade.setValue(1);
-      splashStartRef.current = Date.now();
-    } else if (!splashStartRef.current) {
-      splashStartRef.current = Date.now();
-    }
+    if (!splashVisible) { setSplashVisible(true); splashFade.setValue(1); splashStartRef.current = Date.now(); }
+    else if (!splashStartRef.current) { splashStartRef.current = Date.now(); }
   }, [splashFade, splashVisible]);
 
   // HW Back
@@ -471,12 +349,7 @@ const App = () => {
       const nav = lastNavStateRef.current || {};
       const isRoot = nav.isRoot === true;
       const webCanHandle = !isRoot || nav.hasBlockingUI === true || nav.needsConfirm === true || nav.canGoBackInWeb === true;
-
-      if (webCanHandle) {
-        sendToWeb('BACK_REQUEST', { nav, at: Date.now() });
-        return true;
-      }
-
+      if (webCanHandle) { sendToWeb('BACK_REQUEST', { nav, at: Date.now() }); return true; }
       Alert.alert('앱 종료', '앱을 종료할까요?', [
         { text: '취소', style: 'cancel' },
         { text: '종료', style: 'destructive', onPress: () => BackHandler.exitApp() },
@@ -504,13 +377,8 @@ const App = () => {
     try { const settings = await notifee.requestPermission(); return !!settings?.authorizationStatus; }
     catch { return false; }
   }, []);
-
   const replyPermissionStatus = useCallback(({ pushGranted }) => {
-    sendToWeb('PERMISSION_STATUS', {
-      push: { granted: !!pushGranted, blocked: false },
-      token,
-      install_id: installId ?? 'unknown',
-    });
+    sendToWeb('PERMISSION_STATUS', { push: { granted: !!pushGranted, blocked: false }, token, install_id: installId ?? 'unknown' });
   }, [sendToWeb, token, installId]);
 
   // Push: token + foreground
@@ -524,7 +392,6 @@ const App = () => {
         sendToWeb('PUSH_TOKEN', { token: fcmToken, platform: Platform.OS, app_version: APP_VERSION, install_id: installId ?? 'unknown', ts: Date.now() });
       } catch (e) { console.log('❌ FCM token error:', e); }
     })();
-
     const unsubscribe = messaging().onMessage(async (remoteMessage) => {
       sendToWeb('PUSH_EVENT', {
         event: 'received',
@@ -550,39 +417,139 @@ const App = () => {
         console.log('[IAP][init][ERR]', e?.code, e?.message || String(e));
       }
 
+      // 구독 offerToken 선적재
+      try { await preloadOfferTokens(ANDROID_SKUS); } catch { }
+
+      // (디버그) 등록된 단건 상품 조회
+      try {
+        const prods = await RNIAP.getProducts({ skus: [ANDROID_INAPP_BASIC] });
+        DBG.log('getProducts.len=', prods?.length || 0);
+        DBG.chunk('getProducts.items', prods);
+      } catch (e) {
+        DBG.chunk('getProducts.CATCH', { raw: e });
+      }
+      // 구매 성공/보류 리스너
       purchaseUpdateSub = RNIAP.purchaseUpdatedListener(async (p) => {
         try {
-          const { productId, orderId, purchaseToken, purchaseStateAndroid, isAcknowledgedAndroid } = p || {};
-          if (purchaseStateAndroid === 1 && !isAcknowledgedAndroid && purchaseToken) {
-            try { await RNIAP.acknowledgePurchaseAndroid(purchaseToken); } catch (e) {
-              console.log('[IAP][ack][ERR]', e?.code, e?.message || String(e));
+          const { productId, orderId, purchaseToken, purchaseStateAndroid, isAcknowledgedAndroid, transactionId } = p || {};
+          DBG.chunk('purchaseUpdated.payload', p);
+
+          const id = orderId || purchaseToken || transactionId || null;
+
+          // ====== 동일 토큰 중복 처리 방지 ======
+          if (purchaseToken && handledTokensRef.current.has(purchaseToken)) {
+            DBG.log('finishTransaction.skip (already handled)', productId, purchaseToken);
+            return;
+          }
+
+          // ── 단건(Consumable) 처리: 베이직(wm_basic_n)
+          if (productId === ANDROID_INAPP_BASIC) {
+            try {
+              // v14 표준: 구매 객체 p 넘기고 consumable=true
+              await RNIAP.finishTransaction(p, true);
+              DBG.log('finishTransaction.done (consumable)', productId);
+
+              handledTokensRef.current.add(purchaseToken);
+              sendToWeb('PURCHASE_RESULT', {
+                success: true, platform: Platform.OS,
+                one_time: true, product_id: productId, transaction_id: id,
+              });
+              endIap();
+              return;
+            } catch (fe) {
+              const msg = String(fe?.message || fe);
+              DBG.log('finishTransaction.ERROR', fe?.code, msg);
+
+              // ====== 우회 시나리오 ======
+              // 일부 단말/샌드박스에서 'not suitable' / 'already'가 뜨면
+              // 비소모(false)로 마무리 시도 + ack 시도 후 성공으로 처리.
+              if (/not suitable/i.test(msg) || /already/i.test(msg)) {
+                try {
+                  try { await RNIAP.finishTransaction(p, false); } catch { }
+                  try { await RNIAP.acknowledgePurchaseAndroid?.(purchaseToken); } catch { }
+                  DBG.log('finishTransaction.fallback.done', productId);
+
+                  handledTokensRef.current.add(purchaseToken);
+                  sendToWeb('PURCHASE_RESULT', {
+                    success: true, platform: Platform.OS,
+                    one_time: true, product_id: productId, transaction_id: id,
+                  });
+                  endIap();
+                  return;
+                } catch (fe2) {
+                  DBG.log('finishTransaction.fallback.ERROR', fe2?.code, String(fe2?.message || fe2));
+                  sendToWeb('PURCHASE_RESULT', {
+                    success: false, platform: Platform.OS,
+                    error_code: fe2?.code || 'finish_failed',
+                    message: String(fe2?.message || fe2),
+                  });
+                  endIap();
+                  return;
+                }
+              }
+
+              // 일반 실패
+              sendToWeb('PURCHASE_RESULT', {
+                success: false, platform: Platform.OS,
+                error_code: fe?.code || 'finish_failed',
+                message: msg,
+              });
+              endIap();
+              return;
             }
           }
+
+          // ── 구독 처리 ──
+          // 보류(PENDING)
+          if (purchaseStateAndroid === 2) {
+            sendToWeb('SUBSCRIPTION_RESULT', {
+              success: false, pending: true, platform: 'android',
+              product_id: productId || '', transaction_id: id, message: '승인 대기',
+            });
+            endIap();
+            return;
+          }
+
+          // 완료 + 미인증 → acknowledge
+          if (purchaseStateAndroid === 1 && !isAcknowledgedAndroid && purchaseToken) {
+            try { await RNIAP.acknowledgePurchaseAndroid(purchaseToken); }
+            catch (e) { DBG.log('[IAP][ack][ERR]', e?.code, e?.message || String(e)); }
+          }
+
+          handledTokensRef.current.add(purchaseToken);
           sendToWeb('SUBSCRIPTION_RESULT', {
-            success: true,
-            platform: 'android',
+            success: true, platform: 'android',
             product_id: productId || '',
-            transaction_id: orderId || purchaseToken || null,
+            transaction_id: id,
             acknowledged: true,
           });
+          endIap();
         } catch (e) {
-          console.log('[IAP][purchaseUpdated][ERR]', e?.code, e?.message || String(e));
+          DBG.log('[IAP][purchaseUpdated][ERR]', e?.code, e?.message || String(e));
           sendToWeb('SUBSCRIPTION_RESULT', {
             success: false, platform: 'android',
             error_code: e?.code || 'purchase_handle_failed',
             message: String(e?.message || e),
           });
+          endIap();
         }
       });
 
+
+      // 구매 에러 리스너
       purchaseErrorSub = RNIAP.purchaseErrorListener((err) => {
         console.log('[IAP][ERR]', err?.code, err?.message);
-        sendToWeb('SUBSCRIPTION_RESULT', {
-          success: false, platform: 'android',
+        const payload = {
+          success: false, platform: Platform.OS,
           error_code: err?.code || 'purchase_error',
           message: err?.message || String(err),
-        });
+        };
+        // 단건/구독 공통 에러 콜백
+        sendToWeb('PURCHASE_RESULT', payload);
+        sendToWeb('SUBSCRIPTION_RESULT', payload);
+        endIap();
       });
+
     })();
 
     return () => {
@@ -592,22 +559,125 @@ const App = () => {
     };
   }, [sendToWeb]);
 
-  // ─────────── IAP helpers ───────────
-  async function buyAndroidSku(productId, offerToken) {
+  // ─────────── 구매 실행(구독) ───────────
+  async function buyAndroidSku(sku) {
     try {
-      if (!productId || !ANDROID_SKUS.includes(productId)) throw new Error('invalid_sku');
-      const params = offerToken
-        ? { sku: productId, subscriptionOffers: [{ sku: productId, offerToken }] }
-        : { sku: productId };
-      try { await RNIAP.requestSubscription(params); }
-      catch (e14) {
-        try { await RNIAP.requestSubscription({ sku: productId }); }
-        catch (e13) { throw e14; }
+      if (!ANDROID_SKUS.includes(sku)) throw new Error('invalid_sku');
+      DBG.log('buyAndroidSku.begin', sku);
+
+      // 최신 offerToken 확보(있으면 붙이고, 없어도 호출 가능)
+      let offerToken = await ensureOfferToken(sku);
+      try {
+        const items = await RNIAP.getSubscriptions({ skus: [sku] });
+        const d = items?.find(p => p.productId === sku);
+        const alt = d?.subscriptionOfferDetails?.[0]?.offerToken || null;
+        if (!offerToken && alt) offerToken = alt;
+        DBG.chunk('buyAndroidSku.subItem', d || {});
+      } catch (e) {
+        DBG.log('buyAndroidSku.getSubs.err', e?.code, e?.message);
       }
+
+      const params = offerToken
+        ? { sku, subscriptionOffers: [{ sku, offerToken }] }
+        : { sku };
+      DBG.chunk('buyAndroidSku.params', params);
+
+      await RNIAP.requestSubscription(params);
+      DBG.log('requestSubscription.called');
     } catch (e) {
-      sendToWeb('SUBSCRIPTION_RESULT', { success: false, platform: 'android', error_code: e?.code || 'request_failed', message: String(e?.message || e) });
+      const code = e?.code || '';
+      const msg = String(e?.message || e);
+
+      if (code === 'E_USER_CANCELLED' || /cancel/i.test(msg)) {
+        DBG.log('subscription.user_cancelled');
+        sendToWeb('SUBSCRIPTION_RESULT', {
+          success: false, platform: 'android',
+          error_code: 'E_USER_CANCELLED',
+          message: 'Payment is Cancelled.',
+          cancelled: true,
+        });
+        try { endIap(); } catch { }
+        return;
+      }
+
+      DBG.log('buyAndroidSku.ERROR', code, msg);
+      sendToWeb('SUBSCRIPTION_RESULT', {
+        success: false, platform: 'android',
+        error_code: code || 'request_failed',
+        message: msg,
+      });
+      DBG.toast(`구독요청 실패: ${msg}`);
+      try { endIap(); } catch { }
     }
   }
+
+
+
+
+  // ─────────── 구매 실행(단건/Consumable — ANDROID 전용) ───────────
+  async function buyAndroidOneTime(sku) {
+    try {
+      if (!sku) throw new Error('invalid_inapp_sku');
+      DBG.log('buyAndroidOneTime.begin', { sku });
+
+      // ✅ v14 안드로이드: { skus: [...] } 한 번만 호출
+      const params = { skus: [sku] };
+      DBG.chunk('buyAndroidOneTime.params', params);
+
+      await RNIAP.requestPurchase(params);
+      DBG.log('requestPurchase.called');
+      // 성공/실패/취소는 리스너(purchaseUpdated/purchaseError)에서 처리(endIap 포함)
+    } catch (e) {
+      const code = e?.code || '';
+      const msg = String(e?.message || e);
+
+      // ✅ 사용자가 취소한 경우: 재시도/폴백 금지, 바로 종료
+      if (code === 'E_USER_CANCELLED' || /cancel/i.test(msg)) {
+        DBG.log('purchase.user_cancelled');
+        // 웹에 "취소" 알림(완료 아님)
+        sendToWeb('PURCHASE_RESULT', {
+          success: false,
+          platform: 'android',
+          error_code: 'E_USER_CANCELLED',
+          message: 'Payment is Cancelled.',
+          cancelled: true,
+        });
+        try { endIap(); } catch { }
+        return;
+      }
+
+      // 기타 실패
+      DBG.chunk('buyAndroidOneTime.ERROR', { raw: e });
+      sendToWeb('PURCHASE_RESULT', {
+        success: false,
+        platform: 'android',
+        error_code: code || 'purchase_failed',
+        message: msg,
+      });
+      DBG.toast(`일회성 구매 실패: ${msg}`);
+      try { endIap(); } catch { }
+    }
+  }
+
+
+  // (iOS용 단건 — 분리 프로젝트라 해도 안전하게 처리)
+  async function buyIOSOneTime(sku) {
+    try {
+      if (!sku) throw new Error('invalid_inapp_sku_ios');
+      DBG.log('buyIOSOneTime.begin', sku);
+      await RNIAP.requestPurchase({ sku });
+      DBG.log('buyIOSOneTime.requestPurchase.called');
+    } catch (e) {
+      DBG.chunk('buyIOSOneTime.ERROR', { raw: e });
+      sendToWeb('PURCHASE_RESULT', {
+        success: false, platform: 'ios',
+        error_code: e?.code || 'purchase_failed',
+        message: String(e?.message || e),
+      });
+    }
+  }
+
+  // 복원(구독 중심; 단건 소비성은 복원 대상 아님)
   async function restoreAndroidSubs() {
     try {
       const items = await RNIAP.getAvailablePurchases();
@@ -616,13 +686,16 @@ const App = () => {
         items: (items || []).map(p => ({ product_id: p.productId, transaction_id: p.transactionId || p.orderId || null })),
       });
     } catch (e) {
-      sendToWeb('SUBSCRIPTION_RESTORED', { success: false, platform: 'android', error_code: e?.code || 'restore_failed', message: String(e?.message || e) });
+      sendToWeb('SUBSCRIPTION_RESTORED', {
+        success: false, platform: 'android',
+        error_code: e?.code || 'restore_failed',
+        message: String(e?.message || e),
+      });
     }
   }
 
-  // Auth: Google/Kakao
+  // Auth: Google/Kakao (기존 유지)
   const safeSend = (type, payload) => { try { sendToWeb(type, payload); } catch (e) { console.log('[SEND_ERROR]', e); } };
-
   const handleStartSignin = useCallback(async (payload) => {
     const provider = payload?.provider;
     try {
@@ -703,41 +776,86 @@ const App = () => {
   }, [sendToWeb]);
 
   // Web → App 라우터
-  const handleCheckPermission = useCallback(async () => {
-    const push = await ensureNotificationPermission();
-    replyPermissionStatus({ pushGranted: push });
-  }, [ensureNotificationPermission, replyPermissionStatus]);
-
-  const handleRequestPermission = useCallback(async () => {
-    const push = await ensureNotificationPermission();
-    replyPermissionStatus({ pushGranted: push });
-  }, [ensureNotificationPermission, replyPermissionStatus]);
+  const handleCheckPermission = useCallback(async () => { const push = await ensureNotificationPermission(); replyPermissionStatus({ pushGranted: push }); }, [ensureNotificationPermission, replyPermissionStatus]);
+  const handleRequestPermission = useCallback(async () => { const push = await ensureNotificationPermission(); replyPermissionStatus({ pushGranted: push }); }, [ensureNotificationPermission, replyPermissionStatus]);
 
   const onMessageFromWeb = useCallback(async (e) => {
     try {
       const raw = e.nativeEvent.data;
-      if (typeof raw === 'string' && raw.startsWith('open::')) {
-        const url = raw.replace('open::', ''); try { await Linking.openURL(url); } catch { }; return;
-      }
+      if (typeof raw === 'string' && raw.startsWith('open::')) { const url = raw.replace('open::', ''); try { await Linking.openURL(url); } catch { }; return; }
       const data = JSON.parse(raw);
-      switch (data.type) {
-        case 'GET_INSTALLATION_ID': {
-          sendToWeb('INSTALLATION_ID', { install_id: installId ?? 'unknown', ts: Date.now() });
-          break;
-        }
 
+      switch (data.type) {
+        case 'GET_INSTALLATION_ID': { sendToWeb('INSTALLATION_ID', { install_id: installId ?? 'unknown', ts: Date.now() }); break; }
         case 'WEB_READY': await handleWebReady(); break;
         case 'WEB_ERROR': await handleWebError(data.payload); break;
-
         case 'CHECK_PERMISSION': await handleCheckPermission(); break;
         case 'REQUEST_PERMISSION': await handleRequestPermission(); break;
 
-        // ✅ 실제 결제 시작
+        // ✅ 구독 결제
         case 'START_SUBSCRIPTION': {
           const sku = data?.payload?.product_id;
-          const offerToken = data?.payload?.offer_token; // (한 SKU에 오퍼 여러 개일 때만 필요)
-          if (Platform.OS === 'android') await buyAndroidSku(sku, offerToken);
-          else sendToWeb('SUBSCRIPTION_RESULT', { success: false, platform: 'ios', error_code: 'not_supported' });
+          DBG.log('START_SUBSCRIPTION recv sku=', sku);
+
+
+          // 시작 락
+          if (!beginIap('subscription', { sku })) { DBG.log('IAP busy. ignore'); break; }
+
+          // 🔒 세이프가드: 베이직(인앱)이 구독 경로로 들어오면 '단건'으로 재라우팅
+          if (sku === ANDROID_INAPP_BASIC /* 'wm_basic_n' */) {
+            DBG.log('route_fix', 'in-app SKU on subscription path → buying one-time');
+            if (Platform.OS === 'android') await buyAndroidOneTime(sku);
+            else await buyIOSOneTime(sku);
+            // 결과/락 해제는 리스너에서
+            break;
+          }
+
+          // ⬇️ 여기부터는 '구독'만 통과
+          if (!sku || !ANDROID_SKUS.includes(sku)) {
+
+            sendToWeb('SUBSCRIPTION_RESULT', {
+              success: false, platform: Platform.OS,
+              error_code: 'bad_sku', message: `unknown sku ${sku}`
+            });
+            endIap(); // 시작했으므로 해제
+            break;
+          }
+
+          if (Platform.OS === 'android') {
+       
+            await buyAndroidSku(sku);
+          } else {
+            sendToWeb('SUBSCRIPTION_RESULT', { success: false, platform: 'ios', error_code: 'not_supported' });
+            endIap();
+          }
+          break;
+        }
+
+        // ✅ 단건(베이직) 결제
+        case 'START_ONE_TIME_PURCHASE': {
+          const sku = data?.payload?.product_id; // 'wm_basic_n'
+          DBG.log('START_ONE_TIME_PURCHASE recv sku=', sku);
+ 
+          if (!beginIap('one_time', { sku })) { DBG.log('IAP busy. ignore'); break; }
+          if (!sku) {
+            sendToWeb('PURCHASE_RESULT', { success: false, platform: Platform.OS, error_code: 'bad_sku', message: 'no sku' });
+            endIap();
+            break;
+          }
+
+          if (Platform.OS === 'android') {
+            await buyAndroidOneTime(sku);
+          } else {
+            await buyIOSOneTime(sku);
+          }
+          // 결과/락 해제는 리스너에서
+          break;
+        }
+
+
+        case 'RESTORE_SUBSCRIPTIONS': {
+          if (Platform.OS === 'android') await restoreAndroidSubs();
+          else sendToWeb('SUBSCRIPTION_RESTORED', { success: false, platform: 'ios', error_code: 'not_supported' });
           break;
         }
 
@@ -781,13 +899,6 @@ const App = () => {
           break;
         }
 
-        // 복원
-        case 'RESTORE_SUBSCRIPTIONS': {
-          if (Platform.OS === 'android') await restoreAndroidSubs();
-          else sendToWeb('SUBSCRIPTION_RESTORED', { success: false, platform: 'ios', error_code: 'not_supported' });
-          break;
-        }
-
         case 'START_SIGNIN': await handleStartSignin(data.payload); break;
         case 'START_SIGNOUT': await handleStartSignout(); break;
 
@@ -823,21 +934,15 @@ const App = () => {
           const payload = data.payload || {};
           const ok = !!payload.success;
           const err = payload.error || payload.error_code || null;
-
           console.groupCollapsed(`[NAVER_LOGIN_DONE] success=${ok}${err ? ` error=${err}` : ''}`);
           console.table({ success: ok, error: err || '', uid: payload.uid || '', mock: payload.mock ? 'yes' : 'no', at: new Date().toISOString() });
           logChunked('[NAVER_LOGIN_DONE] payload', payload);
           console.groupEnd();
-
           sendToWeb('NAVER_LOGIN_ACK', { success: ok, at: Date.now(), error: err || undefined });
           break;
         }
 
-        case 'NAVER_DEBUG': {
-          logChunked('[NAVER_DEBUG data]', data);
-          logChunked('[NAVER_DEBUG payload]', data.payload);
-          break;
-        }
+        case 'NAVER_DEBUG': { logChunked('[NAVER_DEBUG data]', data); logChunked('[NAVER_DEBUG payload]', data.payload); break; }
 
         default: console.log('⚠️ unknown msg:', data.type);
       }
@@ -859,7 +964,6 @@ const App = () => {
         <StatusBar barStyle="dark-content" backgroundColor="#ffffff" />
         <WebView
           ref={webViewRef}
-          // source={{ uri: 'https://wizad-b69ee.web.app/' }}
           source={{ uri: 'http://www.wizmarket.ai/ads/start' }}
           onMessage={onMessageFromWeb}
           onLoadStart={onWebViewLoadStart}
