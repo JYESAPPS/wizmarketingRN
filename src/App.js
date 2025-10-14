@@ -272,6 +272,27 @@ async function saveDataUrlToGallery(dataUrl, filename) {
   await CameraRoll.save(tmpPath, { type: 'photo' });
 }
 
+async function openManageSubscriptionAndroid({ packageName, sku } = {}) {
+  if (Platform.OS !== 'android') return;
+
+  // 패키지+SKU 있으면 해당 구독 상세, 없으면 구독 목록
+  const deep = (packageName && sku)
+    ? `https://play.google.com/store/account/subscriptions?sku=${encodeURIComponent(sku)}&package=${encodeURIComponent(packageName)}`
+    : 'https://play.google.com/store/account/subscriptions';
+
+  try {
+    const ok = await Linking.canOpenURL(deep);
+    if (ok) return Linking.openURL(deep);
+  } catch (e) { }
+
+  // 폴백 1: 해당 앱 상세 페이지(스토어 앱)
+  if (packageName) {
+    try { return await Linking.openURL(`market://details?id=${packageName}`); } catch (e) { }
+  }
+  // 폴백 2: 웹 주소
+  return Linking.openURL('https://play.google.com/store/account/subscriptions');
+}
+
 // ─────────── App 컴포넌트 ───────────
 const App = () => {
   const webViewRef = useRef(null);
@@ -856,6 +877,13 @@ const App = () => {
         case 'RESTORE_SUBSCRIPTIONS': {
           if (Platform.OS === 'android') await restoreAndroidSubs();
           else sendToWeb('SUBSCRIPTION_RESTORED', { success: false, platform: 'ios', error_code: 'not_supported' });
+          break;
+        }
+          
+        case 'MANAGE_SUBSCRIPTION': {
+          // payload 예: { packageName: 'com.wizmarket.app', sku: 'wm_premium_m' }
+          const { packageName, sku } = data?.payload || {};
+          await openManageSubscriptionAndroid({ packageName, sku });
           break;
         }
 
