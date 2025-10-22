@@ -238,7 +238,11 @@ async function handleShareToChannel(payload, sendToWeb) {
     const ext = guessExt(file) || 'jpg';
     const mime = extToMime(ext) || 'image/*';
 
-    if (key === 'KAKAO') {
+    if (key === 'INSTAGRAM') {
+      await shareToInstagramFeed(payload, sendToWeb);
+    } else if (key === 'INSTAGRAM_STORIES') {
+      await shareToInstagramStories(payload, sendToWeb);
+    } else if (key === 'KAKAO') {
       const src = data.imageUrl || data.url || data.image;
       const cleanText = safeStr(text);
       const pasteText = stripImageUrlsFromText(cleanText);
@@ -253,10 +257,12 @@ async function handleShareToChannel(payload, sendToWeb) {
       await Share.open({ title: '카카오톡으로 공유', url: fileUrl, type: kMime, filename: `share.${kExt}`, message: pasteText, failOnCancel: false });
       sendToWeb('SHARE_RESULT', { success: true, platform: key, post_id: null });
       return;
+    } else {
+      await Share.open({ url: file, message: text, title: '공유', type: mime, filename: `share.${ext}`, failOnCancel: false });
+      sendToWeb('SHARE_RESULT', { success: true, platform: key, post_id: null });
     }
 
-    await Share.open({ url: file, message: text, title: '공유', type: mime, filename: `share.${ext}`, failOnCancel: false });
-    sendToWeb('SHARE_RESULT', { success: true, platform: key, post_id: null });
+
   } catch (err) {
     sendToWeb('SHARE_RESULT', { success: false, platform: key, error_code: 'share_failed', message: String(err?.message || err) });
   }
@@ -292,6 +298,72 @@ async function openManageSubscriptionAndroid({ packageName, sku } = {}) {
   // 폴백 2: 웹 주소
   return Linking.openURL('https://play.google.com/store/account/subscriptions');
 }
+
+// ───────── Instagram 전용 공유 함수 (DM 방지 완전판) ─────────
+// 규칙: message 절대 넘기지 않음, 로컬 file:// 경로만 전달, 캡션은 클립보드만.
+
+async function shareToInstagramFeed(payloadOrData = {}, sendToWeb) {
+  // payloadOrData: { data: { image|url|imageUrl, caption, hashtags }, ... } | { image|url|imageUrl, ... }
+  const d = payloadOrData?.data ?? payloadOrData ?? {};
+  const src = d.imageUrl || d.url || d.image;
+  if (!src) throw new Error('no_image_source');
+
+  // 1) 캡션을 클립보드로만 (텍스트를 Share 파라미터로 보내면 DM로 라우팅될 수 있음)
+  try {
+    const cap = buildFinalText({
+      caption: d.caption,
+      hashtags: d.hashtags,
+      couponEnabled: false,
+      link: undefined, // 인스타 캡션에는 링크 넣지 않는걸 권장
+    });
+    if (cap) Clipboard.setString(cap);
+  } catch { }
+
+  // 2) 이미지 로컬 파일 확보 (jpg 권장)
+  const { uri, cleanup } = await ensureLocalFile(src, 'jpg');
+  try {
+    // 3) 인스타 피드 — 텍스트 금지, 강제 타겟팅
+    await Share.shareSingle({
+      social: Share.Social.INSTAGRAM,
+      url: uri,           // file://… 로컬 경로
+      failOnCancel: false,
+    });
+    sendToWeb?.('SHARE_RESULT', { success: true, platform: 'INSTAGRAM', post_id: null });
+  } finally {
+    try { await cleanup?.(); } catch { }
+  }
+}
+
+async function shareToInstagramStories(payloadOrData = {}, sendToWeb) {
+  const d = payloadOrData?.data ?? payloadOrData ?? {};
+  const src = d.imageUrl || d.url || d.image;
+  if (!src) throw new Error('no_image_source');
+
+  // 1) 캡션은 클립보드만 (스토리는 텍스트 파라미터 무시/오동작 가능)
+  try {
+    const cap = buildFinalText({
+      caption: d.caption,
+      hashtags: d.hashtags,
+      couponEnabled: false,
+      link: undefined,
+    });
+    if (cap) Clipboard.setString(cap);
+  } catch { }
+
+  // 2) 스토리는 PNG가 가장 안전
+  const { uri, cleanup } = await ensureLocalPng(src);
+  try {
+    await Share.shareSingle({
+      social: Share.Social.INSTAGRAM_STORIES,
+      backgroundImage: uri,   // file://… 로컬 PNG
+      failOnCancel: false,
+    });
+    sendToWeb?.('SHARE_RESULT', { success: true, platform: 'INSTAGRAM_STORIES', post_id: null });
+  } finally {
+    try { await cleanup?.(); } catch { }
+  }
+}
+
 
 // ─────────── App 컴포넌트 ───────────
 const App = () => {
