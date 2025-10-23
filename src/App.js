@@ -396,61 +396,76 @@ async function shareToInstagramFeed(payloadOrData = {}, sendToWeb) {
 
 
 
+// 전제: buildFinalText, ensureLocalPng, Clipboard, Share 가 import되어 있음
 
 async function shareToInstagramStories(payloadOrData = {}, sendToWeb) {
-  const d = payloadOrData?.data ?? payloadOrData ?? {};
-  const src = d.imageUrl || d.url || d.image;
-  if (!src) throw new Error('no_image_source');
-
-  // 1) 캡션은 클립보드만 (스토리는 텍스트 파라미터 무시/오동작 가능)
+  const TAG = '[IG_STORY]';
   try {
-    const cap = buildFinalText({
-      caption: d.caption,
-      hashtags: d.hashtags,
-      couponEnabled: false,
-      link: undefined,
-    });
-    if (cap) Clipboard.setString(cap);
-  } catch { }
+    const d = payloadOrData?.data ?? payloadOrData ?? {};
+    const src = d.imageUrl || d.url || d.image;
+    if (!src) throw new Error('no_image_source');
 
-  // 2) 스토리는 PNG가 가장 안전
-  const { uri: bgUri, cleanup } = await ensureLocalPng(file);
-
-
-  try {
-    // 1차: 배경 이미지 방식
-    await Share.shareSingle({
-      social: Share.Social.INSTAGRAM_STORIES,
-      backgroundImage: bgUri,            // 로컬 PNG
-      attributionURL: data.link,         // 선택
-      backgroundTopColor: '#000000',     // 선택
-      backgroundBottomColor: '#000000',
-      type: 'image/png',
-      filename: 'share.png',
-      failOnCancel: false,
-    });
-  } catch (e1) {
+    // 1) 스토리는 텍스트 파라미터가 무시되므로 캡션은 클립보드로만
     try {
-      // 2차: 스티커 방식 폴백
+      const cap = buildFinalText({
+        caption: d.caption,
+        hashtags: d.hashtags,
+        couponEnabled: false,
+        link: undefined,
+      });
+      if (cap) Clipboard.setString(cap);
+    } catch { }
+
+    // 2) PNG 확보 (스토리는 PNG가 안정적)
+    const { uri: pngUri, cleanup } = await ensureLocalPng(src);
+
+    // 3) backgroundImage → stickerImage → 시스템 공유 폴백
+    try {
       await Share.shareSingle({
         social: Share.Social.INSTAGRAM_STORIES,
-        stickerImage: bgUri,              // 스티커로
-        attributionURL: data.link,
+        backgroundImage: pngUri,
+        attributionURL: d.link,           // 선택(무시될 수 있음)
         backgroundTopColor: '#000000',
         backgroundBottomColor: '#000000',
         type: 'image/png',
         filename: 'share.png',
         failOnCancel: false,
       });
-    } catch (e2) {
-      // 최종 폴백: 시스템 공유
-      await Share.open({ url: bgUri, type: 'image/png', filename: 'share.png', failOnCancel: false });
+      sendToWeb?.('SHARE_RESULT', { success: true, platform: 'INSTAGRAM_STORIES', method: 'backgroundImage' });
+    } catch (e1) {
+      try {
+        await Share.shareSingle({
+          social: Share.Social.INSTAGRAM_STORIES,
+          stickerImage: pngUri,
+          attributionURL: d.link,
+          backgroundTopColor: '#000000',
+          backgroundBottomColor: '#000000',
+          type: 'image/png',
+          filename: 'share.png',
+          failOnCancel: false,
+        });
+        sendToWeb?.('SHARE_RESULT', { success: true, platform: 'INSTAGRAM_STORIES', method: 'stickerImage' });
+      } catch (e2) {
+        await Share.open({
+          url: pngUri,
+          type: 'image/png',
+          filename: 'share.png',
+          failOnCancel: false,
+        });
+        sendToWeb?.('SHARE_RESULT', { success: true, platform: 'SYSTEM', method: 'fallback' });
+      }
+    } finally {
+      await cleanup();
     }
-  } finally {
-    await cleanup();
+  } catch (err) {
+    sendToWeb?.('SHARE_RESULT', {
+      success: false,
+      platform: 'INSTAGRAM_STORIES',
+      error_code: 'share_failed',
+      message: String(err?.message || err),
+    });
   }
 }
-
 
 
 
